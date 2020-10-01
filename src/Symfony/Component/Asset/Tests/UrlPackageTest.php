@@ -23,7 +23,7 @@ class UrlPackageTest extends TestCase
      */
     public function testGetUrl($baseUrls, $format, $path, $expected)
     {
-        $package = new UrlPackage($baseUrls, new StaticVersionStrategy('v1', $format));
+        $package = new UrlPackage('name', $baseUrls, new StaticVersionStrategy('v1', $format));
         $this->assertSame($expected, $package->getUrl($path));
     }
 
@@ -63,7 +63,7 @@ class UrlPackageTest extends TestCase
      */
     public function testGetUrlWithContext($secure, $baseUrls, $format, $path, $expected)
     {
-        $package = new UrlPackage($baseUrls, new StaticVersionStrategy('v1', $format), $this->getContext($secure));
+        $package = new UrlPackage('name', $baseUrls, new StaticVersionStrategy('v1', $format), $this->getContext($secure));
 
         $this->assertSame($expected, $package->getUrl($path));
     }
@@ -90,7 +90,7 @@ class UrlPackageTest extends TestCase
         $versionStrategy->expects($this->any())
             ->method('applyVersion')
             ->willReturn('https://cdn.com/bar/main.css');
-        $package = new UrlPackage('https://example.com', $versionStrategy);
+        $package = new UrlPackage('name', 'https://example.com', $versionStrategy);
 
         $this->assertSame('https://cdn.com/bar/main.css', $package->getUrl('main.css'));
     }
@@ -98,7 +98,7 @@ class UrlPackageTest extends TestCase
     public function testNoBaseUrls()
     {
         $this->expectException('Symfony\Component\Asset\Exception\LogicException');
-        new UrlPackage([], new EmptyVersionStrategy());
+        new UrlPackage('name', [], new EmptyVersionStrategy());
     }
 
     /**
@@ -107,7 +107,7 @@ class UrlPackageTest extends TestCase
     public function testWrongBaseUrl($baseUrls)
     {
         $this->expectException('Symfony\Component\Asset\Exception\InvalidArgumentException');
-        new UrlPackage($baseUrls, new EmptyVersionStrategy());
+        new UrlPackage('name', $baseUrls, new EmptyVersionStrategy());
     }
 
     public function getWrongBaseUrlConfig()

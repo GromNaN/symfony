@@ -23,7 +23,7 @@ class PackageTest extends TestCase
      */
     public function testGetUrl($version, $format, $path, $expected)
     {
-        $package = new Package($version ? new StaticVersionStrategy($version, $format) : new EmptyVersionStrategy());
+        $package = new Package('name', $version ? new StaticVersionStrategy($version, $format) : new EmptyVersionStrategy());
         $this->assertSame($expected, $package->getUrl($path));
     }
 
@@ -47,9 +47,15 @@ class PackageTest extends TestCase
         ];
     }
 
+    public function testGetName()
+    {
+        $package = new Package('name', new StaticVersionStrategy('v1'));
+        $this->assertSame('name', $package->getName());
+    }
+
     public function testGetVersion()
     {
-        $package = new Package(new StaticVersionStrategy('v1'));
+        $package = new Package('name', new EmptyVersionStrategy());
         $this->assertSame('v1', $package->getVersion('/foo'));
     }
 }

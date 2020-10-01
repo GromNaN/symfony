@@ -22,7 +22,7 @@ class PackagesTest extends TestCase
     {
         $packages = new Packages();
         $packages->setDefaultPackage($default = $this->getMockBuilder('Symfony\Component\Asset\PackageInterface')->getMock());
-        $packages->addPackage('a', $a = $this->getMockBuilder('Symfony\Component\Asset\PackageInterface')->getMock());
+        $packages->addPackage($a = $this->getMockBuilder('Symfony\Component\Asset\PackageInterface')->method('getName')->willReturn('a')->getMock());
 
         $this->assertSame($default, $packages->getPackage());
         $this->assertSame($a, $packages->getPackage('a'));
@@ -37,7 +37,7 @@ class PackagesTest extends TestCase
     {
         $packages = new Packages(
             new Package(new StaticVersionStrategy('default')),
-            ['a' => new Package(new StaticVersionStrategy('a'))]
+            [new Package('a', new StaticVersionStrategy('a'))]
         );
 
         $this->assertSame('default', $packages->getVersion('/foo'));
@@ -47,8 +47,8 @@ class PackagesTest extends TestCase
     public function testGetUrl()
     {
         $packages = new Packages(
-            new Package(new StaticVersionStrategy('default')),
-            new \ArrayIterator(['a' => new Package(new StaticVersionStrategy('a'))])
+            new Package('default', new StaticVersionStrategy('default')),
+            new \ArrayIterator([new Package('a', new StaticVersionStrategy('a'))])
         );
 
         $this->assertSame('/foo?default', $packages->getUrl('/foo'));

@@ -1,6 +1,12 @@
 CHANGELOG
 =========
 
+6.0.0
+-----
+
+ * [BC break] added method `PackageInterface::getName()` and modified `Packages`
+  contructor and `Packages::addPackage()` to get the name from the package.
+
 5.2.0
 -----
 

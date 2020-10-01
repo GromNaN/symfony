@@ -31,4 +31,12 @@ interface PackageInterface
      * @return string The public path
      */
     public function getUrl(string $path);
+
+
+    /**
+     * Returns the name of the package.
+     *
+     * @return string The package name
+     */
+    public function getName();
 }

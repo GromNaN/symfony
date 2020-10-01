@@ -579,29 +579,30 @@ abstract class FrameworkExtensionTest extends TestCase
 
         // packages
         $packageTags = $container->findTaggedServiceIds('assets.package');
-        $this->assertCount(7, $packageTags);
+        $this->assertCount(8, $packageTags);
 
         $packages = [];
         foreach ($packageTags as $serviceId => $tagAttributes) {
-            $packages[$tagAttributes[0]['package']] = $serviceId;
+            $package = $container->getDefinition($serviceId);
+            $packages[$package->getArgument(0)] = $package;
         }
 
-        $package = $container->getDefinition((string) $packages['images_path']);
+        $package = $packages['images_path'];
         $this->assertPathPackage($container, $package, '/foo', 'SomeVersionScheme', '%%s?version=%%s');
 
-        $package = $container->getDefinition((string) $packages['images']);
+        $package = $packages['images'];
         $this->assertUrlPackage($container, $package, ['http://images1.example.com', 'http://images2.example.com'], '1.0.0', '%%s?version=%%s');
 
-        $package = $container->getDefinition((string) $packages['foo']);
+        $package = $packages['foo'];
         $this->assertPathPackage($container, $package, '', '1.0.0', '%%s-%%s');
 
-        $package = $container->getDefinition((string) $packages['bar']);
+        $package = $packages['bar'];
         $this->assertUrlPackage($container, $package, ['https://bar2.example.com'], 'SomeVersionScheme', '%%s?version=%%s');
 
-        $package = $container->getDefinition((string) $packages['bar_version_strategy']);
+        $package = $packages['bar_version_strategy'];
         $this->assertEquals('assets.custom_version_strategy', (string) $package->getArgument(1));
 
-        $package = $container->getDefinition((string) $packages['json_manifest_strategy']);
+        $package = $packages['json_manifest_strategy'];
         $versionStrategy = $container->getDefinition((string) $package->getArgument(1));
         $this->assertEquals('assets.json_manifest_version_strategy', $versionStrategy->getParent());
         $this->assertEquals('/path/to/manifest.json', $versionStrategy->getArgument(0));
