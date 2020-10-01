@@ -22,7 +22,7 @@ class PathPackageTest extends TestCase
      */
     public function testGetUrl($basePath, $format, $path, $expected)
     {
-        $package = new PathPackage($basePath, new StaticVersionStrategy('v1', $format));
+        $package = new PathPackage('name', $basePath, new StaticVersionStrategy('v1', $format));
         $this->assertSame($expected, $package->getUrl($path));
     }
 
@@ -53,7 +53,7 @@ class PathPackageTest extends TestCase
      */
     public function testGetUrlWithContext($basePathRequest, $basePath, $format, $path, $expected)
     {
-        $package = new PathPackage($basePath, new StaticVersionStrategy('v1', $format), $this->getContext($basePathRequest));
+        $package = new PathPackage('name', $basePath, new StaticVersionStrategy('v1', $format), $this->getContext($basePathRequest));
 
         $this->assertSame($expected, $package->getUrl($path));
     }
@@ -81,7 +81,7 @@ class PathPackageTest extends TestCase
         $versionStrategy->expects($this->any())
             ->method('applyVersion')
             ->willReturn('https://cdn.com/bar/main.css');
-        $package = new PathPackage('/subdirectory', $versionStrategy, $this->getContext('/bar'));
+        $package = new PathPackage('name', '/subdirectory', $versionStrategy, $this->getContext('/bar'));
 
         $this->assertSame('https://cdn.com/bar/main.css', $package->getUrl('main.css'));
     }

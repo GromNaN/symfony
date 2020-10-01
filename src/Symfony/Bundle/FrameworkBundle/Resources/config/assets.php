@@ -31,7 +31,7 @@ return static function (ContainerConfigurator $container) {
         ->set('assets.packages', Packages::class)
             ->args([
                 service('assets._default_package'),
-                tagged_iterator('assets.package', 'package'),
+                tagged_iterator('assets.package'),
             ])
 
         ->alias(Packages::class, 'assets.packages')
@@ -53,6 +53,7 @@ return static function (ContainerConfigurator $container) {
         ->set('assets.path_package', PathPackage::class)
             ->abstract()
             ->args([
+                abstract_arg('name'),
                 abstract_arg('base path'),
                 abstract_arg('version strategy'),
                 service('assets.context'),
@@ -61,6 +62,7 @@ return static function (ContainerConfigurator $container) {
         ->set('assets.url_package', UrlPackage::class)
             ->abstract()
             ->args([
+                abstract_arg('name'),
                 abstract_arg('base URLs'),
                 abstract_arg('version strategy'),
                 service('assets.context'),

@@ -32,8 +32,8 @@ class Packages
     {
         $this->defaultPackage = $defaultPackage;
 
-        foreach ($packages as $name => $package) {
-            $this->addPackage($name, $package);
+        foreach ($packages as $package) {
+            $this->addPackage($package);
         }
     }
 
@@ -42,9 +42,9 @@ class Packages
         $this->defaultPackage = $defaultPackage;
     }
 
-    public function addPackage(string $name, PackageInterface $package)
+    public function addPackage(PackageInterface $package)
     {
-        $this->packages[$name] = $package;
+        $this->packages[$package->getName()] = $package;
     }
 
     /**

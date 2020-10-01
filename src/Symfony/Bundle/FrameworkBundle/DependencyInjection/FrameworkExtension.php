@@ -445,6 +445,8 @@ class FrameworkExtension extends Extension
             $loader->load('mime_type.php');
         }
 
+        $container->registerForAutoconfiguration(PackageInterface::class)
+            ->addTag('assets.package');
         $container->registerForAutoconfiguration(Command::class)
             ->addTag('console.command');
         $container->registerForAutoconfiguration(ResourceCheckerInterface::class)
@@ -1054,7 +1056,7 @@ class FrameworkExtension extends Extension
             $defaultVersion = $this->createVersion($container, $config['version'], $config['version_format'], $config['json_manifest_path'], '_default');
         }
 
-        $defaultPackage = $this->createPackageDefinition($config['base_path'], $config['base_urls'], $defaultVersion);
+        $defaultPackage = $this->createPackageDefinition('default', $config['base_path'], $config['base_urls'], $defaultVersion);
         $container->setDefinition('assets._default_package', $defaultPackage);
 
         foreach ($config['packages'] as $name => $package) {
@@ -1070,8 +1072,8 @@ class FrameworkExtension extends Extension
                 $version = $this->createVersion($container, $version, $format, $package['json_manifest_path'], $name);
             }
 
-            $packageDefinition = $this->createPackageDefinition($package['base_path'], $package['base_urls'], $version)
-                ->addTag('assets.package', ['package' => $name]);
+            $packageDefinition = $this->createPackageDefinition($name, $package['base_path'], $package['base_urls'], $version)
+                ->addTag('assets.package');
             $container->setDefinition('assets._package_'.$name, $packageDefinition);
             $container->registerAliasForArgument('assets._package_'.$name, PackageInterface::class, $name.'.package');
         }
@@ -1080,7 +1082,7 @@ class FrameworkExtension extends Extension
     /**
      * Returns a definition for an asset package.
      */
-    private function createPackageDefinition(?string $basePath, array $baseUrls, Reference $version): Definition
+    private function createPackageDefinition(string $name, ?string $basePath, array $baseUrls, Reference $version): Definition
     {
         if ($basePath && $baseUrls) {
             throw new \LogicException('An asset package cannot have base URLs and base paths.');
@@ -1089,8 +1091,9 @@ class FrameworkExtension extends Extension
         $package = new ChildDefinition($baseUrls ? 'assets.url_package' : 'assets.path_package');
         $package
             ->setPublic(false)
-            ->replaceArgument(0, $baseUrls ?: $basePath)
-            ->replaceArgument(1, $version)
+            ->replaceArgument(0, $name)
+            ->replaceArgument(1, $baseUrls ?: $basePath)
+            ->replaceArgument(2, $version)
         ;
 
         return $package;

@@ -23,11 +23,13 @@ use Symfony\Component\Asset\VersionStrategy\VersionStrategyInterface;
  */
 class Package implements PackageInterface
 {
+    private $name;
     private $versionStrategy;
     private $context;
 
-    public function __construct(VersionStrategyInterface $versionStrategy, ContextInterface $context = null)
+    public function __construct(string $name, VersionStrategyInterface $versionStrategy, ContextInterface $context = null)
     {
+        $this->name = $name;
         $this->versionStrategy = $versionStrategy;
         $this->context = $context ?: new NullContext();
     }
@@ -50,6 +52,14 @@ class Package implements PackageInterface
         }
 
         return $this->versionStrategy->applyVersion($path);
+    }
+
+    /**
+     * @return string
+     */
+    public function getName()
+    {
+        return $this->name;
     }
 
     /**
