@@ -23,6 +23,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *     }
  *
  * You could then ask for the version of "main.js" or "css/styles.css".
+ *
+ * @deprecated Use Symfony\Component\Asset\Manifest\RemoteJsonManifest instead.
  */
 class RemoteJsonManifestVersionStrategy implements VersionStrategyInterface
 {

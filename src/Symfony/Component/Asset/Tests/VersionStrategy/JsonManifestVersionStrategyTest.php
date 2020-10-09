@@ -14,6 +14,9 @@ namespace Symfony\Component\Asset\Tests\VersionStrategy;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Asset\VersionStrategy\JsonManifestVersionStrategy;
 
+/**
+ * @group legacy
+ */
 class JsonManifestVersionStrategyTest extends TestCase
 {
     public function testGetVersion()

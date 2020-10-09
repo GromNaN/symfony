@@ -21,6 +21,8 @@ namespace Symfony\Component\Asset\VersionStrategy;
  *     }
  *
  * You could then ask for the version of "main.js" or "css/styles.css".
+ *
+ * @deprecated Use Symfony\Component\Asset\Manifest\JsonManifest instead.
  */
 class JsonManifestVersionStrategy implements VersionStrategyInterface
 {
