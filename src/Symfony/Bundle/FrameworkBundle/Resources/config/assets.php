@@ -12,6 +12,9 @@
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
 use Symfony\Component\Asset\Context\RequestStackContext;
+use Symfony\Component\Asset\Manifest\JsonManifest;
+use Symfony\Component\Asset\Manifest\RemoteJsonManifest;
+use Symfony\Component\Asset\ManifestPackage;
 use Symfony\Component\Asset\Package;
 use Symfony\Component\Asset\Packages;
 use Symfony\Component\Asset\PathPackage;
@@ -78,11 +81,29 @@ return static function (ContainerConfigurator $container) {
             ->args([
                 abstract_arg('manifest path'),
             ])
+            ->deprecate('symfony/framework-bundle', '5.2', 'The "%service_id%" service is deprecated, use "assets.json_manifest" instead.')
 
         ->set('assets.remote_json_manifest_version_strategy', RemoteJsonManifestVersionStrategy::class)
             ->abstract()
             ->args([
                 abstract_arg('manifest url'),
+                service('http_client'),
+            ])
+            ->deprecate('symfony/framework-bundle', '5.2', 'The "%service_id%" service is deprecated, use "assets.remote_json_manifest" instead.')
+
+        ->set('assets.manifest_package', ManifestPackage::class)
+            ->abstract()
+
+        ->set('assets.json_manifest', JsonManifest::class)
+            ->abstract()
+            ->args([
+                abstract_arg('manifest path'),
+            ])
+
+        ->set('assets.remote_json_manifest', RemoteJsonManifest::class)
+            ->abstract()
+            ->args([
+                abstract_arg('manifest path'),
                 service('http_client'),
             ])
     ;
