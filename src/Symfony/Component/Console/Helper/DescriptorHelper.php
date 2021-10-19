@@ -78,6 +78,14 @@ class DescriptorHelper extends Helper
     }
 
     /**
+     * List of supported description formats.
+     */
+    public function getFormats(): array
+    {
+        return array_keys($this->descriptors);
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function getName()

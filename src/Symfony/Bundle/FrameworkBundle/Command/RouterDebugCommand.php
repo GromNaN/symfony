@@ -13,6 +13,9 @@ namespace Symfony\Bundle\FrameworkBundle\Command;
 
 use Symfony\Bundle\FrameworkBundle\Console\Helper\DescriptorHelper;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Completion\CompletionInput;
+use Symfony\Component\Console\Completion\CompletionInterface;
+use Symfony\Component\Console\Completion\CompletionSuggestions;
 use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -31,7 +34,7 @@ use Symfony\Component\Routing\RouterInterface;
  *
  * @final
  */
-class RouterDebugCommand extends Command
+class RouterDebugCommand extends Command implements CompletionInterface
 {
     use BuildDebugContainerTrait;
 
@@ -118,6 +121,15 @@ EOF
         }
 
         return 0;
+    }
+
+    public function complete(CompletionInput $input, CompletionSuggestions $suggestions): void
+    {
+        if ($input->mustSuggestArgumentValuesFor('name')) {
+            $name = $input->getCompletionValue();
+            $routes = $this->router->getRouteCollection();
+            $suggestions->suggestValues($this->findRouteNameContaining($name, $routes));
+        }
     }
 
     private function findRouteNameContaining(string $name, RouteCollection $routes): array
