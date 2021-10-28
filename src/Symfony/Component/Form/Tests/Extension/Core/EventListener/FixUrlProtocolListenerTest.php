@@ -67,7 +67,7 @@ class FixUrlProtocolListenerTest extends TestCase
      */
     public function testDeprecatedFixEmail($url)
     {
-        $this->expectDeprecation('Since symfony/form 5.4: Form type "url", does not add a default protocol to urls that looks like emails or does not contain a dot or slash.');
+        $this->expectDeprecation('Since symfony/form 5.4: Form type "url" does not add a default protocol to urls that look like email addresses or do not contain a dot or slash.');
 
         $form = new Form(new FormConfigBuilder('name', null, new EventDispatcher()));
         $event = new FormEvent($form, $url);
