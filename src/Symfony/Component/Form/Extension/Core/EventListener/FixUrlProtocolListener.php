@@ -40,7 +40,7 @@ class FixUrlProtocolListener implements EventSubscriberInterface
         if ($this->defaultProtocol && $data && \is_string($data) && !preg_match('~^[\w+.-]+://~', $data)) {
             // Detect email & non-url
             if (preg_match('~^([^:/?@]++@|[^./]+$)~', $data)) {
-                trigger_deprecation('symfony/form', '5.4', 'Form type "url", does not add a default protocol to urls that looks like emails or does not contain a dot or slash.');
+                trigger_deprecation('symfony/form', '5.4', 'Form type "url" does not add a default protocol to urls that look like email addresses or do not contain a dot or slash.');
 
                 return;
             }
