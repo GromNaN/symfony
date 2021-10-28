@@ -7,7 +7,7 @@ CHANGELOG
  * Deprecate calling `FormErrorIterator::children()` if the current element is not iterable.
  * Allow to pass `TranslatableMessage` objects to the `help` option
  * Add the `EnumType`
- * `UrlType` does not add the default protocol to urls that looks like emails or does not contain a dot or a slash.
+ * `UrlType` does not add the default protocol to urls that look like email addresses or do not contain a dot or a slash
 
 5.3
 ---
