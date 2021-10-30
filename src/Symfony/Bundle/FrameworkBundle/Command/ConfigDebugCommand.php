@@ -13,6 +13,8 @@ namespace Symfony\Bundle\FrameworkBundle\Command;
 
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 use Symfony\Component\Config\Definition\Processor;
+use Symfony\Component\Console\Completion\CompletionInput;
+use Symfony\Component\Console\Completion\CompletionSuggestions;
 use Symfony\Component\Console\Exception\LogicException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -94,11 +96,7 @@ EOF
         $extensionAlias = $extension->getAlias();
         $container = $this->compileContainer();
 
-        $config = $container->resolveEnvPlaceholders(
-            $container->getParameterBag()->resolveValue(
-                $this->getConfigForExtension($extension, $container)
-            )
-        );
+        $config = $this->getConfig($extension, $container);
 
         if (null === $path = $input->getArgument('path')) {
             $io->title(
@@ -187,5 +185,52 @@ EOF
         $this->validateConfiguration($extension, $configuration);
 
         return (new Processor())->processConfiguration($configuration, $configs);
+    }
+
+    public function complete(CompletionInput $input, CompletionSuggestions $suggestions): void
+    {
+        if ($input->mustSuggestArgumentValuesFor('name')) {
+            $suggestions->suggestValues($this->getAvailableBundles());
+
+            return;
+        }
+
+        if ($input->mustSuggestArgumentValuesFor('path') && null !== $name = $input->getArgument('name')) {
+            $path = $input->getArgument('path');
+            $extension = $this->findExtension($name);
+            $extensionAlias = $extension->getAlias();
+            $container = $this->compileContainer();
+
+            try {
+                $config = $this->getConfigForPath($this->getConfig($extension, $container), $path, $extensionAlias);
+            } catch (LogicException $e) {
+                $config = [];
+            }
+
+            $suggestions->suggestValues(array_keys($config));
+        }
+    }
+
+    private function getAvailableBundles(): array
+    {
+        $availableBundles = [];
+        foreach ($this->getApplication()->getKernel()->getBundles() as $bundle) {
+            $availableBundles[] = $bundle->getName();
+
+            if ($extension = $bundle->getContainerExtension()) {
+                $availableBundles[] = $extension->getAlias();
+            }
+        }
+
+        return $availableBundles;
+    }
+
+    private function getConfig(ExtensionInterface $extension, ContainerBuilder $container)
+    {
+        return $container->resolveEnvPlaceholders(
+            $container->getParameterBag()->resolveValue(
+                $this->getConfigForExtension($extension, $container)
+            )
+        );
     }
 }

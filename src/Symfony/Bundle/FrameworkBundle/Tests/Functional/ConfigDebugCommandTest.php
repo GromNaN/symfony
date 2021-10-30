@@ -11,9 +11,11 @@
 
 namespace Symfony\Bundle\FrameworkBundle\Tests\Functional;
 
+use Symfony\Bundle\FrameworkBundle\Command\ConfigDebugCommand;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
+use Symfony\Component\Console\Tester\CommandCompletionTester;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
@@ -109,6 +111,52 @@ class ConfigDebugCommandTest extends AbstractWebTestCase
 
         $tester = $this->createCommandTester();
         $tester->execute(['name' => 'ExtensionWithoutConfigTestBundle']);
+    }
+
+    /**
+     * @dataProvider provideCompletionSuggestions
+     */
+    public function testComplete(array $input, array $expectedSuggestions)
+    {
+        $this->application->add(new ConfigDebugCommand());
+
+        $tester = new CommandCompletionTester($this->application->get('debug:config'));
+
+        $suggestions = $tester->complete($input, 2);
+
+        $this->assertSame($expectedSuggestions, $suggestions);
+    }
+
+    public function provideCompletionSuggestions(): \Generator
+    {
+        yield 'name' => [
+            [''],
+            [
+                'DefaultConfigTestBundle',
+                'default_config_test',
+                'ExtensionWithoutConfigTestBundle',
+                'extension_without_config_test',
+                'FrameworkBundle',
+                'framework',
+                'TestBundle',
+                'test',
+            ],
+        ];
+
+        yield 'name with existing path' => [
+            ['framework', 'uid'],
+            [
+                'enabled',
+                'default_uuid_version',
+                'name_based_uuid_version',
+                'time_based_uuid_version',
+            ],
+        ];
+
+        yield 'name with unknown path' => [
+            ['default_config_test', 'uid'],
+            [],
+        ];
     }
 
     private function createCommandTester(): CommandTester
