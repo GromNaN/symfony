@@ -12,12 +12,15 @@
 namespace Symfony\Bundle\FrameworkBundle\Command;
 
 use Symfony\Bundle\FrameworkBundle\Console\Descriptor\Descriptor;
+use Symfony\Component\Console\Completion\CompletionInput;
+use Symfony\Component\Console\Completion\CompletionSuggestions;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Debug\FileLinkFormatter;
 
 /**
@@ -77,11 +80,11 @@ EOF
         $errorIo = $io->getErrorStyle();
 
         $builder = $this->getContainerBuilder($this->getApplication()->getKernel());
-        $serviceIds = $builder->getServiceIds();
-        $serviceIds = array_filter($serviceIds, [$this, 'filterToServiceTypes']);
+        $serviceIds = $this->getServices($builder);
 
         if ($search = $input->getArgument('search')) {
             $searchNormalized = preg_replace('/[^a-zA-Z0-9\x7f-\xff]++/', '', $search);
+
             $serviceIds = array_filter($serviceIds, function ($serviceId) use ($searchNormalized) {
                 return false !== stripos(str_replace('\\', '', $serviceId), $searchNormalized) && !str_starts_with($serviceId, '.');
             });
@@ -161,5 +164,48 @@ EOF
         }
 
         return (string) $this->fileLinkFormatter->format($r->getFileName(), $r->getStartLine());
+    }
+
+    public function complete(CompletionInput $input, CompletionSuggestions $suggestions): void
+    {
+        if ($input->mustSuggestArgumentValuesFor('search')) {
+            $builder = $this->getContainerBuilder($this->getApplication()->getKernel());
+            $serviceIds = $this->getServices($builder);
+
+            $services = $this->getServicesCompletion($serviceIds, $input->getArgument('search'), $builder);
+
+            $suggestions->suggestValues($services);
+        }
+    }
+
+    private function getServices(ContainerBuilder $builder): array
+    {
+        $serviceIds = $builder->getServiceIds();
+
+        return array_filter($serviceIds, [$this, 'filterToServiceTypes']);
+    }
+
+    private function getServicesCompletion(array $serviceIds, string $search, ContainerBuilder $builder): array
+    {
+        $services = [];
+        foreach ($serviceIds as $serviceId) {
+            $service = str_replace('\\', '', $serviceId);
+            $service = str_replace('.', '', $service);
+
+            if (
+                false === stripos($service, $search) ||
+                str_starts_with($service, '.') ||
+                false !== strpos($service, ' ')) {
+                continue;
+            }
+
+            $services[] = $serviceId;
+
+            if ($builder->hasAlias($serviceId)) {
+                $services[] = (string) $builder->getAlias($serviceId);
+            }
+        }
+
+        return $services;
     }
 }
