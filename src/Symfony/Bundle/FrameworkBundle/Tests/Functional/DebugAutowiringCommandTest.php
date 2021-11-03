@@ -117,24 +117,20 @@ class DebugAutowiringCommandTest extends AbstractWebTestCase
      */
     public function testComplete(array $input, array $expectedSuggestions)
     {
-        $kernel = static::bootKernel(['test_case' => 'BundlePaths']);
+        $kernel = static::bootKernel(['test_case' => 'ContainerDebug', 'root_config' => 'config.yml']);
         $command = (new Application($kernel))->add(new DebugAutowiringCommand());
 
         $tester = new CommandCompletionTester($command);
 
         $suggestions = $tester->complete($input);
 
-        $this->assertSame($expectedSuggestions, $suggestions);
+        foreach ($expectedSuggestions as $expectedSuggestion) {
+            $this->assertContains($expectedSuggestion, $suggestions);
+        }
     }
 
     public function provideCompletionSuggestions(): \Generator
     {
-        yield 'search' => [
-            ['twig'],
-            [
-                'Twig\Environment',
-                'twig',
-            ],
-        ];
+        yield 'search' => [[''], ['SessionHandlerInterface', 'Psr\\Log\\LoggerInterface', 'Psr\\Container\\ContainerInterface $parameterBag']];
     }
 }

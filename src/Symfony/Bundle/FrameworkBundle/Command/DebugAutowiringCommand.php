@@ -80,11 +80,11 @@ EOF
         $errorIo = $io->getErrorStyle();
 
         $builder = $this->getContainerBuilder($this->getApplication()->getKernel());
-        $serviceIds = $this->getServices($builder);
+        $serviceIds = $builder->getServiceIds();
+        $serviceIds = array_filter($serviceIds, [$this, 'filterToServiceTypes']);
 
         if ($search = $input->getArgument('search')) {
-            $searchNormalized = preg_replace('/[^a-zA-Z0-9\x7f-\xff]++/', '', $search);
-
+            $searchNormalized = preg_replace('/[^a-zA-Z0-9\x7f-\xff $]++/', '', $search);
             $serviceIds = array_filter($serviceIds, function ($serviceId) use ($searchNormalized) {
                 return false !== stripos(str_replace('\\', '', $serviceId), $searchNormalized) && !str_starts_with($serviceId, '.');
             });
@@ -170,42 +170,7 @@ EOF
     {
         if ($input->mustSuggestArgumentValuesFor('search')) {
             $builder = $this->getContainerBuilder($this->getApplication()->getKernel());
-            $serviceIds = $this->getServices($builder);
-
-            $services = $this->getServicesCompletion($serviceIds, $input->getArgument('search'), $builder);
-
-            $suggestions->suggestValues($services);
+            $suggestions->suggestValues(array_filter($builder->getServiceIds(), [$this, 'filterToServiceTypes']));
         }
-    }
-
-    private function getServices(ContainerBuilder $builder): array
-    {
-        $serviceIds = $builder->getServiceIds();
-
-        return array_filter($serviceIds, [$this, 'filterToServiceTypes']);
-    }
-
-    private function getServicesCompletion(array $serviceIds, string $search, ContainerBuilder $builder): array
-    {
-        $services = [];
-        foreach ($serviceIds as $serviceId) {
-            $service = str_replace('\\', '', $serviceId);
-            $service = str_replace('.', '', $service);
-
-            if (
-                false === stripos($service, $search) ||
-                str_starts_with($service, '.') ||
-                false !== strpos($service, ' ')) {
-                continue;
-            }
-
-            $services[] = $serviceId;
-
-            if ($builder->hasAlias($serviceId)) {
-                $services[] = (string) $builder->getAlias($serviceId);
-            }
-        }
-
-        return $services;
     }
 }
