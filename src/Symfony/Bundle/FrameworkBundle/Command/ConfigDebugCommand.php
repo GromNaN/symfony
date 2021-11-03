@@ -190,36 +190,26 @@ EOF
     public function complete(CompletionInput $input, CompletionSuggestions $suggestions): void
     {
         if ($input->mustSuggestArgumentValuesFor('name')) {
-            $suggestions->suggestValues($this->getAvailableBundles());
+            $suggestions->suggestValues($this->getAvailableBundles(!preg_match('/[A-Z]/', $input->getCompletionValue()[0] ?? '')));
 
             return;
         }
 
         if ($input->mustSuggestArgumentValuesFor('path') && null !== $name = $input->getArgument('name')) {
-            $path = $input->getArgument('path');
-            $extension = $this->findExtension($name);
-            $extensionAlias = $extension->getAlias();
-            $container = $this->compileContainer();
-
             try {
-                $config = $this->getConfigForPath($this->getConfig($extension, $container), $path, $extensionAlias);
+                $config = $this->getConfig($this->findExtension($name), $this->compileContainer());
+                $paths = array_keys(self::flatten($config));
+                $suggestions->suggestValues($paths);
             } catch (LogicException $e) {
-                $config = [];
             }
-
-            $suggestions->suggestValues(array_keys($config));
         }
     }
 
-    private function getAvailableBundles(): array
+    private function getAvailableBundles(bool $alias): array
     {
         $availableBundles = [];
         foreach ($this->getApplication()->getKernel()->getBundles() as $bundle) {
-            $availableBundles[] = $bundle->getName();
-
-            if ($extension = $bundle->getContainerExtension()) {
-                $availableBundles[] = $extension->getAlias();
-            }
+            $availableBundles[] = $alias ? $bundle->getContainerExtension()->getAlias() : $bundle->getName();
         }
 
         return $availableBundles;
@@ -232,5 +222,18 @@ EOF
                 $this->getConfigForExtension($extension, $container)
             )
         );
+    }
+
+    private static function flatten($array, $prefix = '') {
+        $result = [];
+        foreach ($array as $key => $value) {
+            if (\is_array($value)) {
+                $result = $result + self::flatten($value, $prefix . $key . '.');
+            } else {
+                $result[$prefix.$key] = null;
+            }
+        }
+
+        return $result;
     }
 }
