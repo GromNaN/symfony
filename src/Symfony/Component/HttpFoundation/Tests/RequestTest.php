@@ -2186,6 +2186,7 @@ class RequestTest extends TestCase
             ['OPTIONS', true],
             ['TRACE', true],
             ['CONNECT', false],
+            ['QUERY', true],
         ];
     }
 
@@ -2212,6 +2213,7 @@ class RequestTest extends TestCase
             ['OPTIONS', true],
             ['TRACE', true],
             ['CONNECT', false],
+            ['QUERY', true],
         ];
     }
 
@@ -2238,6 +2240,7 @@ class RequestTest extends TestCase
             ['OPTIONS', false],
             ['TRACE', false],
             ['CONNECT', false],
+            ['QUERY', true],
         ];
     }
 
