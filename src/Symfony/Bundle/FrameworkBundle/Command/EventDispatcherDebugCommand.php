@@ -22,6 +22,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Contracts\Service\ServiceProviderInterface;
 
 /**
  * A console command for retrieving information about event dispatcher.
@@ -127,40 +128,24 @@ EOF
     {
         if ($input->mustSuggestArgumentValuesFor('event')) {
             $dispatcherServiceName = $input->getOption('dispatcher');
-            if (!$this->dispatchers->has($dispatcherServiceName)) {
-                return;
+            if ($this->dispatchers->has($dispatcherServiceName)) {
+                $dispatcher = $this->dispatchers->get($dispatcherServiceName);
+                $suggestions->suggestValues(array_keys($dispatcher->getListeners()));
             }
-
-            $dispatcher = $this->dispatchers->get($dispatcherServiceName);
-            $listeners = $dispatcher->getListeners();
-            $eventNames = array_keys($listeners);
-            $listenersName = [];
-            foreach ($listeners as $listOfListener) {
-                $listenersName = array_merge($listenersName, $listOfListener);
-            }
-            $suggestions->suggestValues(array_merge(
-                $eventNames,
-                $listenersName,
-            ));
 
             return;
         }
 
         if ($input->mustSuggestOptionValuesFor('dispatcher')) {
-            $suggestions->suggestValues(array_merge(
-                $this->dispatchers->getServiceIds(),
-                $this->dispatchers->getAliases()
-            ));
+            if ($this->dispatchers instanceof ServiceProviderInterface) {
+                $suggestions->suggestValues(array_keys($this->dispatchers->getProvidedServices()));
+            }
 
             return;
         }
 
         if ($input->mustSuggestOptionValuesFor('format')) {
-            $suggestions->suggestValues(
-                (new DescriptorHelper())->getFormats()
-            );
-
-            return;
+            $suggestions->suggestValues((new DescriptorHelper())->getFormats());
         }
     }
 

@@ -13,12 +13,9 @@ namespace Symfony\Bundle\FrameworkBundle\Tests\Command;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\Command\EventDispatcherDebugCommand;
-use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandCompletionTester;
-use Symfony\Component\DependencyInjection\Container;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\EventDispatcher;
-use Symfony\Component\HttpKernel\KernelInterface;
 
 class EventDispatcherDebugCommandCompletionTest extends TestCase
 {
@@ -36,81 +33,38 @@ class EventDispatcherDebugCommandCompletionTest extends TestCase
 
     public function provideCompletionSuggestions()
     {
-        yield 'event' => [[''], ['event', 'Listener']];
-        yield 'event for other dispatcher' => [['--dispatcher=other_event_dispatcher', 'other'], ['other_event', 'OtherListener']];
+        yield 'event' => [[''], ['Symfony\Component\Mailer\Event\MessageEvent', 'console.command']];
+        yield 'event for other dispatcher' => [['--dispatcher', 'other_event_dispatcher', ''], ['other_event', 'App\OtherEvent']];
         yield 'dispatcher' => [['--dispatcher='], ['event_dispatcher', 'other_event_dispatcher']];
         yield 'format' => [['--format='], ['txt', 'xml', 'json', 'md']];
     }
 
     private function createCommandCompletionTester(): CommandCompletionTester
     {
-        $kernel = $this->createMock(KernelInterface::class);
-
-        $kernel
-            ->expects($this->any())
-            ->method('getBundle')
-            ->willReturnMap([]);
-
-        $kernel
-            ->expects($this->any())
-            ->method('getBundles')
-            ->willReturn([]);
-
-        $container = new Container();
-
-        $kernel
-            ->expects($this->any())
-            ->method('getContainer')
-            ->willReturn($container);
-
         $dispatcher = new EventDispatcher();
         $otherDispatcher = new EventDispatcher();
 
         $dispatcher->addListener('event', 'Listener');
         $otherDispatcher->addListener('other_event', 'OtherListener');
 
-        $locator = $this->createLocator([
-            'event_dispatcher' => $dispatcher,
-            'other_event_dispatcher' => $otherDispatcher,
+        $dispatchers = new ServiceLocator([
+            'event_dispatcher' => function () {
+                $dispatcher = new EventDispatcher();
+                $dispatcher->addListener('Symfony\Component\Mailer\Event\MessageEvent', 'var_dump');
+                $dispatcher->addListener('console.command', 'var_dump');
+
+                return $dispatcher;
+            },
+            'other_event_dispatcher' => function () {
+                $dispatcher = new EventDispatcher();
+                $dispatcher->addListener('other_event', 'var_dump');
+                $dispatcher->addListener('App\OtherEvent', 'var_dump');
+
+                return $dispatcher;
+            },
         ]);
+        $command = new EventDispatcherDebugCommand($dispatchers);
 
-        $command = new EventDispatcherDebugCommand($locator);
-
-        $application = new Application($kernel);
-
-        $application->add($command);
-
-        return new CommandCompletionTester($application->find('debug:event-dispatcher'));
-    }
-
-    private function createLocator(array $linkers)
-    {
-        $locator = $this->createMock(ContainerBuilder::class);
-
-        $locator->expects($this->any())
-            ->method('has')
-            ->willReturnCallback(function ($dispatcherServiceName) use ($linkers) {
-                return isset($linkers[$dispatcherServiceName]);
-            });
-
-        $locator->expects($this->any())
-            ->method('get')
-            ->willReturnCallback(function ($dispatcherServiceName) use ($linkers) {
-                return $linkers[$dispatcherServiceName];
-            });
-
-        $locator->expects($this->any())
-            ->method('getServiceIds')
-            ->willReturnCallback(function () use ($linkers) {
-                return array_keys($linkers);
-            });
-
-        $locator->expects($this->any())
-            ->method('getAliases')
-            ->willReturnCallback(function () {
-                return [];
-            });
-
-        return $locator;
+        return new CommandCompletionTester($command);
     }
 }
