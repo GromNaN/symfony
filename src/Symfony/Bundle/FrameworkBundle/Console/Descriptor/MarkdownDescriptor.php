@@ -13,6 +13,7 @@ namespace Symfony\Bundle\FrameworkBundle\Console\Descriptor;
 
 use Symfony\Component\Console\Exception\LogicException;
 use Symfony\Component\Console\Exception\RuntimeException;
+use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\DependencyInjection\Alias;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
@@ -281,7 +282,29 @@ class MarkdownDescriptor extends Descriptor
 
     protected function describeContainerEnvVars(array $envs, array $options = [])
     {
-        throw new LogicException('Using the markdown format to debug environment variables is not supported.');
+
+        $this->write("# Environment Variables\n\n");
+
+        if ([] === $envs) {
+            $this->write("There are no environment variables\n");
+
+            return;
+        }
+
+        $table = new Table($this->output);
+        $table->setHeaders(['NAME', 'PROCESSOR', 'DEFAULT', 'VALUE']);
+        $table->setStyle('markdown');
+
+        foreach ($envs as $env) {
+            $table->addRow([
+                $env['default_available'] ? $env['name'] : '**'.$env['name'].'**',
+                $env['processor'],
+                $env['default_available'] ? $env['default_value'] : 'n/a',
+                $env['runtime_available'] ? $env['runtime_value'] : 'n/a',
+            ]);
+        }
+
+        $table->render();
     }
 
     protected function describeEventDispatcherListeners(EventDispatcherInterface $eventDispatcher, array $options = [])

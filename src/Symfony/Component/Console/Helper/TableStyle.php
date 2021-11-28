@@ -47,6 +47,8 @@ class TableStyle
     private $cellRowContentFormat = ' %s ';
     private $borderFormat = '%s';
     private $padType = \STR_PAD_RIGHT;
+    private $firstRowSeparator = true;
+    private $lastRowSeparator = true;
 
     /**
      * Sets padding character, used for cell padding.
@@ -373,4 +375,41 @@ class TableStyle
 
         return $this;
     }
+
+    /**
+     * @return bool
+     */
+    public function hasFirstRowSeparator(): bool
+    {
+        return $this->firstRowSeparator;
+    }
+
+    /**
+     * @param bool $firstRowSeparator
+     */
+    public function setFirstRowSeparator(bool $firstRowSeparator): self
+    {
+        $this->firstRowSeparator = $firstRowSeparator;
+
+        return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasLastRowSeparator(): bool
+    {
+        return $this->lastRowSeparator;
+    }
+
+    /**
+     * @param bool $lastRowSeparator
+     */
+    public function setLastRowSeparator(bool $lastRowSeparator): self
+    {
+        $this->lastRowSeparator = $lastRowSeparator;
+
+        return $this;
+    }
+
 }

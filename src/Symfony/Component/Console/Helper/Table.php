@@ -406,11 +406,13 @@ class Table
             }
 
             if ($isHeader || $isFirstRow) {
-                $this->renderRowSeparator(
-                    $isHeader ? self::SEPARATOR_TOP : self::SEPARATOR_TOP_BOTTOM,
-                    $hasTitle ? $this->headerTitle : null,
-                    $hasTitle ? $this->style->getHeaderTitleFormat() : null
-                );
+                if ($this->style->hasFirstRowSeparator() || $isFirstRow) {
+                    $this->renderRowSeparator(
+                        $isHeader ? self::SEPARATOR_TOP : self::SEPARATOR_TOP_BOTTOM,
+                        $hasTitle ? $this->headerTitle : null,
+                        $hasTitle ? $this->style->getHeaderTitleFormat() : null
+                    );
+                }
                 $isFirstRow = false;
                 $hasTitle = false;
             }
@@ -420,7 +422,9 @@ class Table
                 $this->renderRow($row, $isHeader ? $this->style->getCellHeaderFormat() : $this->style->getCellRowFormat());
             }
         }
-        $this->renderRowSeparator(self::SEPARATOR_BOTTOM, $this->footerTitle, $this->style->getFooterTitleFormat());
+        if ($this->style->hasLastRowSeparator()) {
+            $this->renderRowSeparator(self::SEPARATOR_BOTTOM, $this->footerTitle, $this->style->getFooterTitleFormat());
+        }
 
         $this->cleanup();
         $this->rendered = true;
@@ -869,6 +873,14 @@ class Table
             ->setCrossingChars('┼', '╔', '╤', '╗', '╢', '╝', '╧', '╚', '╟', '╠', '╪', '╣')
         ;
 
+        $markdown = (new TableStyle())
+            ->setHorizontalBorderChars('-', '─')
+            ->setVerticalBorderChars('|', '|')
+            ->setCrossingChars('|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|')
+            ->setFirstRowSeparator(false)
+            ->setLastRowSeparator(false);
+        ;
+
         return [
             'default' => new TableStyle(),
             'borderless' => $borderless,
@@ -876,6 +888,7 @@ class Table
             'symfony-style-guide' => $styleGuide,
             'box' => $box,
             'box-double' => $boxDouble,
+            'markdown' => $markdown,
         ];
     }
 
