@@ -112,6 +112,6 @@ EOF;
     {
         $class = $this->proxyGenerator->getProxifiedClass($definition);
 
-        return substr(hash('sha256', $class.$this->salt), -7);
+        return substr(hash(\PHP_VERSION_ID < 80100 ? 'sha256' : 'xxh128', $class.$this->salt), -7);
     }
 }

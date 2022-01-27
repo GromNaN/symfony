@@ -300,7 +300,7 @@ EOF;
             }
             $namespaceLine = $this->namespace ? "\nnamespace {$this->namespace};\n" : '';
             $time = $options['build_time'];
-            $id = hash('crc32', $hash.$time);
+            $id = hash(\PHP_VERSION_ID < 80100 ? 'crc32' : 'xxh3', $hash.$time);
             $this->asFiles = false;
 
             if ($this->preload && null !== $autoloadFile = $this->getAutoloadFile()) {

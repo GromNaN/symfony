@@ -72,7 +72,7 @@ class FlockStoreTest extends AbstractStoreTest
         $file = sprintf(
             '%s/sf.-php-echo-hello-word-.%s.lock',
             sys_get_temp_dir(),
-            strtr(substr(base64_encode(hash('sha256', $key, true)), 0, 7), '/', '_')
+            strtr(substr(base64_encode(hash(\PHP_VERSION_ID < 80100 ? 'sha256' : 'xxh128'', $key, true)), 0, 7), '/', '_')
         );
         // ensure the file does not exist before the store
         @unlink($file);

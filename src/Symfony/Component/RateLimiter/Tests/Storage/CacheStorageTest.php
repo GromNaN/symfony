@@ -19,13 +19,15 @@ use Symfony\Component\RateLimiter\Storage\CacheStorage;
 
 class CacheStorageTest extends TestCase
 {
-    private $pool;
-    private $storage;
+    private CacheItemPoolInterface $pool;
+    private CacheStorage $storage;
+    private string $testHash;
 
     protected function setUp(): void
     {
         $this->pool = $this->createMock(CacheItemPoolInterface::class);
         $this->storage = new CacheStorage($this->pool);
+        $this->testHash = hash(\PHP_VERSION_ID < 80100 ? 'sha256' : 'xxh128', 'test');
     }
 
     public function testSave()
@@ -33,7 +35,7 @@ class CacheStorageTest extends TestCase
         $cacheItem = $this->createMock(CacheItemInterface::class);
         $cacheItem->expects($this->exactly(2))->method('expiresAfter')->with(10);
 
-        $this->pool->expects($this->any())->method('getItem')->with(sha1('test'))->willReturn($cacheItem);
+        $this->pool->expects($this->any())->method('getItem')->with($this->testHash)->willReturn($cacheItem);
         $this->pool->expects($this->exactly(2))->method('save')->with($cacheItem);
 
         $window = new Window('test', 10, 20);
@@ -50,7 +52,7 @@ class CacheStorageTest extends TestCase
         $cacheItem->expects($this->any())->method('get')->willReturn($window);
         $cacheItem->expects($this->any())->method('isHit')->willReturn(true);
 
-        $this->pool->expects($this->any())->method('getItem')->with(sha1('test'))->willReturn($cacheItem);
+        $this->pool->expects($this->any())->method('getItem')->with($this->testHash)->willReturn($cacheItem);
 
         $this->assertEquals($window, $this->storage->fetch('test'));
     }
@@ -62,7 +64,7 @@ class CacheStorageTest extends TestCase
         $cacheItem->expects($this->any())->method('get')->willReturn('junk');
         $cacheItem->expects($this->any())->method('isHit')->willReturn(true);
 
-        $this->pool->expects($this->any())->method('getItem')->with(sha1('test'))->willReturn($cacheItem);
+        $this->pool->expects($this->any())->method('getItem')->with($this->testHash)->willReturn($cacheItem);
 
         $this->assertNull($this->storage->fetch('test'));
     }
@@ -72,14 +74,14 @@ class CacheStorageTest extends TestCase
         $cacheItem = $this->createMock(CacheItemInterface::class);
         $cacheItem->expects($this->any())->method('isHit')->willReturn(false);
 
-        $this->pool->expects($this->any())->method('getItem')->with(sha1('test'))->willReturn($cacheItem);
+        $this->pool->expects($this->any())->method('getItem')->with($this->testHash)->willReturn($cacheItem);
 
         $this->assertNull($this->storage->fetch('test'));
     }
 
     public function testDelete()
     {
-        $this->pool->expects($this->once())->method('deleteItem')->with(sha1('test'))->willReturn(true);
+        $this->pool->expects($this->once())->method('deleteItem')->with($this->testHash)->willReturn(true);
 
         $this->storage->delete('test');
     }

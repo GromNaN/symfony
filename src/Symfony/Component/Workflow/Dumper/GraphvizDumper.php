@@ -239,7 +239,7 @@ class GraphvizDumper implements DumperInterface
      */
     protected function dotize(string $id): string
     {
-        return hash('sha1', $id);
+        return hash(\PHP_VERSION_ID < 80100 ? 'sha1' : 'xxh3', $id);
     }
 
     /**

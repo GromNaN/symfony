@@ -28,7 +28,7 @@ class CacheStorage implements StorageInterface
 
     public function save(LimiterStateInterface $limiterState): void
     {
-        $cacheItem = $this->pool->getItem(sha1($limiterState->getId()));
+        $cacheItem = $this->pool->getItem($this->hashItemId($limiterState->getId()));
         $cacheItem->set($limiterState);
         if (null !== ($expireAfter = $limiterState->getExpirationTime())) {
             $cacheItem->expiresAfter($expireAfter);
@@ -39,7 +39,7 @@ class CacheStorage implements StorageInterface
 
     public function fetch(string $limiterStateId): ?LimiterStateInterface
     {
-        $cacheItem = $this->pool->getItem(sha1($limiterStateId));
+        $cacheItem = $this->pool->getItem($this->hashItemId($limiterStateId));
         $value = $cacheItem->get();
         if ($value instanceof LimiterStateInterface) {
             return $value;
@@ -50,6 +50,11 @@ class CacheStorage implements StorageInterface
 
     public function delete(string $limiterStateId): void
     {
-        $this->pool->deleteItem(sha1($limiterStateId));
+        $this->pool->deleteItem($this->hashItemId($limiterStateId));
+    }
+
+    private function hashItemId(string $id): string
+    {
+        return hash(\PHP_VERSION_ID < 80100 ? 'sha1' : 'xxh3', $id);
     }
 }

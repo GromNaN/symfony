@@ -101,7 +101,7 @@ class FlockStore implements BlockingStoreInterface, SharedLockStoreInterface
             $fileName = sprintf('%s/sf.%s.%s.lock',
                 $this->lockPath,
                 substr(preg_replace('/[^a-z0-9\._-]+/i', '-', $key), 0, 50),
-                strtr(substr(base64_encode(hash('sha256', $key, true)), 0, 7), '/', '_')
+                strtr(substr(base64_encode(hash(\PHP_VERSION_ID < 80100 ? 'sha256' : 'xxh128', $key, true)), 0, 7), '/', '_')
             );
 
             // Silence error reporting

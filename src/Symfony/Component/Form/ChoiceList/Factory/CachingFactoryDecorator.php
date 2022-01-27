@@ -40,12 +40,10 @@ class CachingFactoryDecorator implements ChoiceListFactoryInterface, ResetInterf
     private array $views = [];
 
     /**
-     * Generates a SHA-256 hash for the given value.
+     * Generates a hash for the given value.
      *
-     * Optionally, a namespace string can be passed. Calling this method will
+     * Optionally, a namespace string can be passed. Calling this method with
      * the same values, but different namespaces, will return different hashes.
-     *
-     * @return string The SHA-256 hash
      *
      * @internal
      */
@@ -61,7 +59,7 @@ class CachingFactoryDecorator implements ChoiceListFactoryInterface, ResetInterf
             });
         }
 
-        return hash('sha256', $namespace.':'.serialize($value));
+        return hash(\PHP_VERSION_ID < 80100 ? 'sha256' : 'xxh128', $namespace.':'.serialize($value));
     }
 
     public function __construct(ChoiceListFactoryInterface $decoratedFactory)

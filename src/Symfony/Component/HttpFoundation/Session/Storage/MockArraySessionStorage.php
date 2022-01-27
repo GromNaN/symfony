@@ -229,7 +229,7 @@ class MockArraySessionStorage implements SessionStorageInterface
      */
     protected function generateId(): string
     {
-        return hash('sha256', uniqid('ss_mock_', true));
+        return hash(\PHP_VERSION_ID < 80100 ? 'sha256' : 'xxh3', uniqid('ss_mock_', true));
     }
 
     protected function loadSession()

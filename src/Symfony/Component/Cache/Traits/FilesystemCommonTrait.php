@@ -120,8 +120,8 @@ trait FilesystemCommonTrait
 
     private function getFile(string $id, bool $mkdir = false, string $directory = null)
     {
-        // Use MD5 to favor speed over security, which is not an issue here
-        $hash = str_replace('/', '-', base64_encode(hash('md5', static::class.$id, true)));
+        // Use MD5 or SSH128 to favor speed over security, which is not an issue here
+        $hash = str_replace('/', '-', base64_encode(hash(\PHP_VERSION_ID < 80100 ? 'md5' : 'xxh128', static::class.$id, true)));
         $dir = ($directory ?? $this->directory).strtoupper($hash[0].\DIRECTORY_SEPARATOR.$hash[1].\DIRECTORY_SEPARATOR);
 
         if ($mkdir && !is_dir($dir)) {
