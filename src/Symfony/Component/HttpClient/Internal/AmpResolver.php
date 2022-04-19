@@ -13,8 +13,6 @@ namespace Symfony\Component\HttpClient\Internal;
 
 use Amp\Dns;
 use Amp\Dns\Record;
-use Amp\Promise;
-use Amp\Success;
 
 /**
  * Handles local overrides for the DNS resolver.
@@ -32,21 +30,21 @@ class AmpResolver implements Dns\Resolver
         $this->dnsMap = &$dnsMap;
     }
 
-    public function resolve(string $name, int $typeRestriction = null): Promise
+    public function resolve(string $name, int $typeRestriction = null): array
     {
         if (!isset($this->dnsMap[$name]) || !\in_array($typeRestriction, [Record::A, null], true)) {
             return Dns\resolver()->resolve($name, $typeRestriction);
         }
 
-        return new Success([new Record($this->dnsMap[$name], Record::A, null)]);
+        return [new Record($this->dnsMap[$name], Record::A, null)];
     }
 
-    public function query(string $name, int $type): Promise
+    public function query(string $name, int $type): array
     {
         if (!isset($this->dnsMap[$name]) || Record::A !== $type) {
             return Dns\resolver()->query($name, $type);
         }
 
-        return new Success([new Record($this->dnsMap[$name], Record::A, null)]);
+        return [new Record($this->dnsMap[$name], Record::A, null)];
     }
 }

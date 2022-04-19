@@ -12,15 +12,10 @@
 namespace Symfony\Component\HttpClient\Response;
 
 use Amp\ByteStream\StreamException;
-use Amp\CancellationTokenSource;
-use Amp\Coroutine;
-use Amp\Deferred;
+use Amp\DeferredCancellation;
 use Amp\Http\Client\HttpException;
 use Amp\Http\Client\Request;
 use Amp\Http\Client\Response;
-use Amp\Loop;
-use Amp\Promise;
-use Amp\Success;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpClient\Chunk\FirstChunk;
 use Symfony\Component\HttpClient\Chunk\InformationalChunk;
@@ -32,6 +27,7 @@ use Symfony\Component\HttpClient\Internal\AmpClientState;
 use Symfony\Component\HttpClient\Internal\Canary;
 use Symfony\Component\HttpClient\Internal\ClientState;
 use Symfony\Contracts\HttpClient\ResponseInterface;
+use function Amp\delay;
 
 /**
  * @author Nicolas Grekas <p@tchwork.com>
@@ -47,10 +43,11 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
 
     private AmpClientState $multi;
     private ?array $options;
-    private CancellationTokenSource $canceller;
+    private DeferredCancellation $canceller;
     private \Closure $onProgress;
 
     private static ?string $delay = null;
+    private float $pauseExpiry = 0.0;
 
     /**
      * @internal
@@ -73,7 +70,7 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
 
         $info = &$this->info;
         $headers = &$this->headers;
-        $canceller = $this->canceller = new CancellationTokenSource();
+        $canceller = $this->canceller = new DeferredCancellation();
         $handle = &$this->handle;
 
         $info['url'] = (string) $request->getUri();
@@ -95,35 +92,26 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
             $onProgress((int) $info['size_download'], ((int) (1 + $info['download_content_length']) ?: 1) - 1, (array) $info);
         };
 
-        $pauseDeferred = new Deferred();
-        $pause = new Success();
-
         $throttleWatcher = null;
 
         $this->id = $id = self::$nextId++;
-        Loop::defer(static function () use ($request, $multi, &$id, &$info, &$headers, $canceller, &$options, $onProgress, &$handle, $logger, &$pause) {
-            return new Coroutine(self::generateResponse($request, $multi, $id, $info, $headers, $canceller, $options, $onProgress, $handle, $logger, $pause));
-        });
 
-        $info['pause_handler'] = static function (float $duration) use (&$throttleWatcher, &$pauseDeferred, &$pause) {
+        $pauseExpiry = &$this->pauseExpiry;
+        $info['pause_handler'] = static function (float $duration) use (&$pauseExpiry) {
+            $pauseExpiry = 0 < $duration ? microtime(true) + $duration : 0;
+        };
+        /*$info['pause_handler'] = static function (float $duration) use (&$throttleWatcher, &$pauseDeferred, $canceller) {
+            delay($duration, true, $canceller->getCancellation());
             if (null !== $throttleWatcher) {
                 Loop::cancel($throttleWatcher);
             }
 
-            $pause = $pauseDeferred->promise();
+            delay(0, true, $canceller->getCancellation());
 
-            if ($duration <= 0) {
-                $deferred = $pauseDeferred;
-                $pauseDeferred = new Deferred();
-                $deferred->resolve();
-            } else {
-                $throttleWatcher = Loop::delay(ceil(1000 * $duration), static function () use (&$pauseDeferred) {
-                    $deferred = $pauseDeferred;
-                    $pauseDeferred = new Deferred();
-                    $deferred->resolve();
-                });
+            if ($duration > 0) {
+                delay(ceil(1000 * $duration), true, $canceller->getCancellation());
             }
-        };
+        };*/
 
         $multi->lastTimeout = null;
         $multi->openHandles[$id] = $id;
@@ -133,6 +121,8 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
             $canceller->cancel();
             unset($multi->openHandles[$id], $multi->handlesActivity[$id]);
         });
+
+        self::generateResponse($request, $multi, $id, $info, $headers, $canceller, $options, $onProgress, $handle, $logger);
     }
 
     /**
@@ -169,7 +159,7 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
     /**
      * {@inheritdoc}
      */
-    private static function schedule(self $response, array &$runningResponses): void
+    protected static function schedule(self $response, array &$runningResponses): void
     {
         if (isset($runningResponses[0])) {
             $runningResponses[0][1][$response->id] = $response;
@@ -221,12 +211,14 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
             }
         });
 
+        delay(ceil(1000 * $timeout));
+
         Loop::run();
 
         return null === self::$delay ? 1 : 0;
     }
 
-    private static function generateResponse(Request $request, AmpClientState $multi, string $id, array &$info, array &$headers, CancellationTokenSource $canceller, array &$options, \Closure $onProgress, &$handle, ?LoggerInterface $logger, Promise &$pause)
+    private static function generateResponse(Request $request, AmpClientState $multi, string $id, array &$info, array &$headers, DeferredCancellation $canceller, array &$options, \Closure $onProgress, &$handle, ?LoggerInterface $logger)
     {
         $request->setInformationalResponseHandler(static function (Response $response) use ($multi, $id, &$info, &$headers) {
             self::addResponseHeaders($response, $info, $headers);
@@ -236,10 +228,10 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
 
         try {
             /* @var Response $response */
-            if (null === $response = yield from self::getPushedResponse($request, $multi, $info, $headers, $options, $logger)) {
+            if (null === $response = self::getPushedResponse($request, $multi, $info, $headers, $options, $logger)) {
                 $logger?->info(sprintf('Request: "%s %s"', $info['http_method'], $info['url']));
 
-                $response = yield from self::followRedirects($request, $multi, $info, $headers, $canceller, $options, $onProgress, $handle, $logger, $pause);
+                $response = self::followRedirects($request, $multi, $info, $headers, $canceller, $options, $onProgress, $handle, $logger);
             }
 
             $options = null;
@@ -263,9 +255,9 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
             while (true) {
                 self::stopLoop();
 
-                yield $pause;
+                delay(0, $canceller);
 
-                if (null === $data = yield $body->read()) {
+                if (null === $data = $body->read()) {
                     break;
                 }
 
@@ -281,16 +273,14 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
         } finally {
             $info['download_content_length'] = $info['size_download'];
         }
-
-        self::stopLoop();
     }
 
-    private static function followRedirects(Request $originRequest, AmpClientState $multi, array &$info, array &$headers, CancellationTokenSource $canceller, array $options, \Closure $onProgress, &$handle, ?LoggerInterface $logger, Promise &$pause)
+    private static function followRedirects(Request $originRequest, AmpClientState $multi, array &$info, array &$headers, DeferredCancellation $canceller, array $options, \Closure $onProgress, &$handle, ?LoggerInterface $logger): ?Response
     {
-        yield $pause;
+        delay(0, true, $canceller->getCancellation());
 
         $originRequest->setBody(new AmpBody($options['body'], $info, $onProgress));
-        $response = yield $multi->request($options, $originRequest, $canceller->getToken(), $info, $onProgress, $handle);
+        $response = $multi->request($options, $originRequest, $canceller, $info, $onProgress, $handle);
         $previousUrl = null;
 
         while (true) {
@@ -325,7 +315,7 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
 
             try {
                 // Discard body of redirects
-                while (null !== yield $response->getBody()->read()) {
+                while (null !== $response->getBody()->read()) {
                 }
             } catch (HttpException|StreamException) {
                 // Ignore streaming errors on previous responses
@@ -366,9 +356,9 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
                 $request->removeHeader('host');
             }
 
-            yield $pause;
+            delay(0, $canceller);
 
-            $response = yield $multi->request($options, $request, $canceller->getToken(), $info, $onProgress, $handle);
+            $response = $multi->request($options, $request, $canceller->getToken(), $info, $onProgress, $handle);
             $info['redirect_time'] = microtime(true) - $info['start_time'];
         }
     }
@@ -399,7 +389,7 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
     /**
      * Accepts pushed responses only if their headers related to authentication match the request.
      */
-    private static function getPushedResponse(Request $request, AmpClientState $multi, array &$info, array &$headers, array $options, ?LoggerInterface $logger)
+    private static function getPushedResponse(Request $request, AmpClientState $multi, array &$info, array &$headers, array $options, ?LoggerInterface $logger): ?Response
     {
         if ('' !== $options['body']) {
             return null;
@@ -424,7 +414,7 @@ final class AmpResponse implements ResponseInterface, StreamableInterface
                 }
             }
 
-            $response = yield $pushedResponse;
+            $response = $pushedResponse;
 
             foreach ($response->getHeaderArray('vary') as $vary) {
                 foreach (preg_split('/\s*+,\s*+/', $vary) as $v) {

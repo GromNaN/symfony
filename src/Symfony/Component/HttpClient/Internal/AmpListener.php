@@ -48,38 +48,30 @@ class AmpListener implements EventListener
         $this->handle = &$handle;
     }
 
-    public function startRequest(Request $request): Promise
+    public function startRequest(Request $request): void
     {
         $this->info['start_time'] = $this->info['start_time'] ?? microtime(true);
         ($this->onProgress)();
-
-        return new Success();
     }
 
-    public function startDnsResolution(Request $request): Promise
+    public function startDnsResolution(Request $request): void
     {
         ($this->onProgress)();
-
-        return new Success();
     }
 
-    public function startConnectionCreation(Request $request): Promise
+    public function startConnectionCreation(Request $request): void
     {
         ($this->onProgress)();
-
-        return new Success();
     }
 
-    public function startTlsNegotiation(Request $request): Promise
+    public function startTlsNegotiation(Request $request): void
     {
         ($this->onProgress)();
-
-        return new Success();
     }
 
-    public function startSendingRequest(Request $request, Stream $stream): Promise
+    public function startSendingRequest(Request $request, Stream $stream): void
     {
-        $host = $stream->getRemoteAddress()->getHost();
+        $host = (string) $stream->getRemoteAddress();
 
         if (str_contains($host, ':')) {
             $host = '['.$host.']';
@@ -126,58 +118,43 @@ class AmpListener implements EventListener
             $this->info['debug'] .= $name.': '.$value."\r\n";
         }
         $this->info['debug'] .= "\r\n";
-
-        return new Success();
     }
 
-    public function completeSendingRequest(Request $request, Stream $stream): Promise
+    public function completeSendingRequest(Request $request, Stream $stream): void
     {
         ($this->onProgress)();
-
-        return new Success();
     }
 
-    public function startReceivingResponse(Request $request, Stream $stream): Promise
+    public function startReceivingResponse(Request $request, Stream $stream): void
     {
         $this->info['starttransfer_time'] = microtime(true) - $this->info['start_time'];
         ($this->onProgress)();
-
-        return new Success();
     }
 
-    public function completeReceivingResponse(Request $request, Stream $stream): Promise
+    public function completeReceivingResponse(Request $request, Stream $stream): void
     {
         $this->handle = null;
         ($this->onProgress)();
-
-        return new Success();
     }
 
-    public function completeDnsResolution(Request $request): Promise
+    public function completeDnsResolution(Request $request): void
     {
         $this->info['namelookup_time'] = microtime(true) - $this->info['start_time'];
         ($this->onProgress)();
-
-        return new Success();
     }
 
-    public function completeConnectionCreation(Request $request): Promise
+    public function completeConnectionCreation(Request $request): void
     {
         $this->info['connect_time'] = microtime(true) - $this->info['start_time'];
         ($this->onProgress)();
-
-        return new Success();
     }
 
-    public function completeTlsNegotiation(Request $request): Promise
+    public function completeTlsNegotiation(Request $request): void
     {
         ($this->onProgress)();
-
-        return new Success();
     }
 
-    public function abort(Request $request, \Throwable $cause): Promise
+    public function abort(Request $request, \Throwable $cause): void
     {
-        return new Success();
     }
 }
