@@ -15,8 +15,6 @@ use Amp\ByteStream\ReadableStream;
 use Amp\ByteStream\ReadableResourceStream;
 use Amp\Cancellation;
 use Amp\Http\Client\RequestBody;
-use Amp\Promise;
-use Amp\Success;
 use Symfony\Component\HttpClient\Exception\TransportException;
 
 /**
@@ -26,7 +24,7 @@ use Symfony\Component\HttpClient\Exception\TransportException;
  */
 class AmpBody implements RequestBody, ReadableStream
 {
-    private ReadableStream|\Closure|string $body;
+    private ReadableResourceStream|\Closure|string $body;
     private array $info;
     private \Closure $onProgress;
     private ?int $offset = 0;
@@ -146,21 +144,35 @@ class AmpBody implements RequestBody, ReadableStream
 
     public function close(): void
     {
-        $this->body->close();
+        if ($this->body instanceof ReadableResourceStream) {
+            $this->body->close();
+        }
     }
 
     public function isClosed(): bool
     {
-        return $this->body->isClosed();
+        if ($this->body instanceof ReadableResourceStream) {
+            return $this->body->isClosed();
+        }
+
+        // @fixme
+        return false;
     }
 
     public function onClose(\Closure $onClose): void
     {
-        $this->onClose($onClose);
+        if ($this->body instanceof ReadableResourceStream) {
+            $this->body->onClose($onClose);
+        }
     }
 
     public function isReadable(): bool
     {
-        return $this->body->isReadable();
+        if ($this->body instanceof ReadableResourceStream) {
+            return $this->body->isReadable();
+        }
+
+        // @fixme
+        return true;
     }
 }
