@@ -54,7 +54,7 @@ class Finder implements \IteratorAggregate, \Countable
     private array $sizes = [];
     private bool $followLinks = false;
     private bool $reverseSorting = false;
-    private \Closure|int|false $sort = false;
+    private \Closure|SortBy|int|false $sort = false;
     private int $ignore = 0;
     private array $dirs = [];
     private array $dates = [];
@@ -424,6 +424,13 @@ class Finder implements \IteratorAggregate, \Countable
         return $this;
     }
 
+    public function sortBy(SortBy $sort): static
+    {
+        $this->sort = $sort;
+
+        return $this;
+    }
+
     /**
      * Sorts files and directories by extension.
      *
@@ -435,7 +442,7 @@ class Finder implements \IteratorAggregate, \Countable
      */
     public function sortByExtension(): static
     {
-        $this->sort = Iterator\SortableIterator::SORT_BY_EXTENSION;
+        $this->sort = SortBy::Extension;
 
         return $this;
     }
@@ -451,7 +458,7 @@ class Finder implements \IteratorAggregate, \Countable
      */
     public function sortByName(bool $useNaturalSort = false): static
     {
-        $this->sort = $useNaturalSort ? Iterator\SortableIterator::SORT_BY_NAME_NATURAL : Iterator\SortableIterator::SORT_BY_NAME;
+        $this->sort = $useNaturalSort ? SortBy::NameNatural : SortBy::Name;
 
         return $this;
     }
@@ -467,7 +474,7 @@ class Finder implements \IteratorAggregate, \Countable
      */
     public function sortByCaseInsensitiveName(bool $useNaturalSort = false): static
     {
-        $this->sort = $useNaturalSort ? Iterator\SortableIterator::SORT_BY_NAME_NATURAL_CASE_INSENSITIVE : Iterator\SortableIterator::SORT_BY_NAME_CASE_INSENSITIVE;
+        $this->sort = $useNaturalSort ? SortBy::NameNaturalCaseInsensitive : SortBy::NameCaseInsensitive;
 
         return $this;
     }
@@ -483,7 +490,7 @@ class Finder implements \IteratorAggregate, \Countable
      */
     public function sortBySize(): static
     {
-        $this->sort = Iterator\SortableIterator::SORT_BY_SIZE;
+        $this->sort = SortBy::Size;
 
         return $this;
     }
@@ -499,7 +506,7 @@ class Finder implements \IteratorAggregate, \Countable
      */
     public function sortByType(): static
     {
-        $this->sort = Iterator\SortableIterator::SORT_BY_TYPE;
+        $this->sort = SortBy::Type;
 
         return $this;
     }
@@ -517,7 +524,7 @@ class Finder implements \IteratorAggregate, \Countable
      */
     public function sortByAccessedTime(): static
     {
-        $this->sort = Iterator\SortableIterator::SORT_BY_ACCESSED_TIME;
+        $this->sort = SortBy::AccessedTime;
 
         return $this;
     }
@@ -549,7 +556,7 @@ class Finder implements \IteratorAggregate, \Countable
      */
     public function sortByChangedTime(): static
     {
-        $this->sort = Iterator\SortableIterator::SORT_BY_CHANGED_TIME;
+        $this->sort = SortBy::ChangedTime;
 
         return $this;
     }
@@ -567,7 +574,7 @@ class Finder implements \IteratorAggregate, \Countable
      */
     public function sortByModifiedTime(): static
     {
-        $this->sort = Iterator\SortableIterator::SORT_BY_MODIFIED_TIME;
+        $this->sort = SortBy::ModifiedTime;
 
         return $this;
     }

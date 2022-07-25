@@ -11,10 +11,14 @@
 
 namespace Symfony\Component\Finder\Tests\Iterator;
 
+use Symfony\Bridge\PhpUnit\ExpectDeprecationTrait;
 use Symfony\Component\Finder\Iterator\SortableIterator;
+use Symfony\Component\Finder\SortBy;
 
 class SortableIteratorTest extends RealIteratorTestCase
 {
+    use ExpectDeprecationTrait;
+
     public function testConstructor()
     {
         try {
@@ -25,6 +29,18 @@ class SortableIteratorTest extends RealIteratorTestCase
         }
     }
 
+
+    /**
+     * @dataProvider getAcceptLegacyData
+     * @group legacy
+     */
+    public function testAcceptLegacy($mode, $expected)
+    {
+        $this->expectDeprecation('');
+
+        $this->testAccept($mode, $expected);
+    }
+
     /**
      * @dataProvider getAcceptData
      */
@@ -33,17 +49,20 @@ class SortableIteratorTest extends RealIteratorTestCase
         if (!\is_callable($mode)) {
             switch ($mode) {
                 case SortableIterator::SORT_BY_ACCESSED_TIME:
+                case SortBy::AccessedTime:
                     touch(self::toAbsolute('.git'));
                     sleep(1);
                     touch(self::toAbsolute('.bar'), time());
                     break;
                 case SortableIterator::SORT_BY_CHANGED_TIME:
+                case SortBy::ChangedTime:
                     sleep(1);
                     file_put_contents(self::toAbsolute('test.php'), 'foo');
                     sleep(1);
                     file_put_contents(self::toAbsolute('test.py'), 'foo');
                     break;
                 case SortableIterator::SORT_BY_MODIFIED_TIME:
+                case SortBy::ModifiedTime:
                     file_put_contents(self::toAbsolute('test.php'), 'foo');
                     sleep(1);
                     file_put_contents(self::toAbsolute('test.py'), 'foo');
@@ -58,8 +77,11 @@ class SortableIteratorTest extends RealIteratorTestCase
         if (SortableIterator::SORT_BY_ACCESSED_TIME === $mode
             || SortableIterator::SORT_BY_CHANGED_TIME === $mode
             || SortableIterator::SORT_BY_MODIFIED_TIME === $mode
+            || SortBy::AccessedTime === $mode
+            || SortBy::ChangedTime === $mode
+            || SortBy::ModifiedTime === $mode
         ) {
-            if ('\\' === \DIRECTORY_SEPARATOR && SortableIterator::SORT_BY_MODIFIED_TIME !== $mode) {
+            if ('\\' === \DIRECTORY_SEPARATOR && (SortableIterator::SORT_BY_MODIFIED_TIME !== $mode || SortBy::ModifiedTime === $mode)) {
                 $this->markTestSkipped('Sorting by atime or ctime is not supported on Windows');
             }
             $this->assertOrderedIteratorForGroups($expected, $iterator);
@@ -68,7 +90,12 @@ class SortableIteratorTest extends RealIteratorTestCase
         }
     }
 
-    public function getAcceptData()
+    public function getAcceptLegacyData()
+    {
+        yield from $this->getAcceptData(true);
+    }
+
+    public function getAcceptData(bool $legacy = false)
     {
         $sortByName = [
             '.bar',
@@ -260,14 +287,17 @@ class SortableIteratorTest extends RealIteratorTestCase
             'zebulon.php',
         ];
 
-        return [
-            [SortableIterator::SORT_BY_NAME, $this->toAbsolute($sortByName)],
-            [SortableIterator::SORT_BY_TYPE, $this->toAbsolute($sortByType)],
-            [SortableIterator::SORT_BY_ACCESSED_TIME, $this->toAbsolute($sortByAccessedTime)],
-            [SortableIterator::SORT_BY_CHANGED_TIME, $this->toAbsolute($sortByChangedTime)],
-            [SortableIterator::SORT_BY_MODIFIED_TIME, $this->toAbsolute($sortByModifiedTime)],
-            [SortableIterator::SORT_BY_NAME_NATURAL, $this->toAbsolute($sortByNameNatural)],
-            [function (\SplFileInfo $a, \SplFileInfo $b) { return strcmp($a->getRealPath(), $b->getRealPath()); }, $this->toAbsolute($customComparison)],
-        ];
+        yield [$legacy ? SortableIterator::SORT_BY_NAME : SortBy::Name, $this->toAbsolute($sortByName)];
+        yield [$legacy ? SortableIterator::SORT_BY_TYPE : SortBy::Type, $this->toAbsolute($sortByType)];
+        yield [$legacy ? SortableIterator::SORT_BY_ACCESSED_TIME : SortBy::AccessedTime, $this->toAbsolute($sortByAccessedTime)];
+        yield [$legacy ? SortableIterator::SORT_BY_CHANGED_TIME : SortBy::ChangedTime, $this->toAbsolute($sortByChangedTime)];
+        yield [$legacy ? SortableIterator::SORT_BY_MODIFIED_TIME : SortBy::ModifiedTime, $this->toAbsolute($sortByModifiedTime)];
+        yield [$legacy ? SortableIterator::SORT_BY_NAME_NATURAL : SortBy::NameNatural, $this->toAbsolute($sortByNameNatural)];
+
+        if (!$legacy) {
+            yield [function (\SplFileInfo $a, \SplFileInfo $b) {
+                return strcmp($a->getRealPath(), $b->getRealPath());
+            }, $this->toAbsolute($customComparison)];
+        }
     }
 }
