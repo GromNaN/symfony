@@ -14,11 +14,12 @@ namespace Symfony\Component\HttpFoundation;
 use function array_keys;
 use function explode;
 use function flush;
+
+use Generator;
+
 use function json_encode;
 
 use const JSON_THROW_ON_ERROR;
-
-use Generator;
 
 /**
  * StreamedJsonResponse represents a streamed HTTP response for JSON.
