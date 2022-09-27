@@ -32,6 +32,25 @@ use const JSON_THROW_ON_ERROR;
  * @see flush()
  *
  * @author Alexander Schranz <alexander@sulu.io>
+ *
+ * Example usage:
+ *
+ * $response = new StreamedJsonResponse(
+ *     // json structure with replace identifiers
+ *     [
+ *         '_embedded' => [
+ *             'articles' => '__articles__',
+ *         ],
+ *     ],
+ *     // array of generators with replace identifier used as key
+ *     [
+ *         '__articles__' => function (): \Generator { // any method or function returning a Generator
+ *              yield 'Article 1';
+ *              yield 'Article 2';
+ *              yield 'Article 3';
+ *         },
+ *     ]
+ * );
  */
 class StreamedJsonResponse extends StreamedResponse
 {
@@ -48,7 +67,7 @@ class StreamedJsonResponse extends StreamedResponse
         private readonly array $generics,
         int $status = 200,
         array $headers = [],
-        protected int $flushSize = 500,
+        private int $flushSize = 500,
     ) {
         parent::__construct(function () {
             $keys = array_keys($this->generics);
