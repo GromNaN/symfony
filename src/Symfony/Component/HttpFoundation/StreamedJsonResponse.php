@@ -11,7 +11,10 @@
 
 namespace Symfony\Component\HttpFoundation;
 
+use function array_keys;
+use function explode;
 use function flush;
+use function json_encode;
 
 /**
  * StreamedJsonResponse represents a streamed HTTP response for JSON.
