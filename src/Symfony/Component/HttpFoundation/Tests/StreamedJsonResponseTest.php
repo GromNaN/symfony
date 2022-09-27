@@ -11,8 +11,11 @@
 
 namespace Symfony\Component\HttpFoundation\Tests;
 
+use Generator;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\StreamedJsonResponse;
+
+use const JSON_UNESCAPED_SLASHES;
 
 class StreamedJsonResponseTest extends TestCase
 {
@@ -75,14 +78,14 @@ class StreamedJsonResponseTest extends TestCase
     public function testEncodingOptions()
     {
         $response = new StreamedJsonResponse([], []);
-        $response->setEncodingOptions(\JSON_UNESCAPED_SLASHES);
+        $response->setEncodingOptions(JSON_UNESCAPED_SLASHES);
 
-        $this->assertSame(\JSON_UNESCAPED_SLASHES, $response->getEncodingOptions() & \JSON_UNESCAPED_SLASHES);
+        $this->assertSame(JSON_UNESCAPED_SLASHES, $response->getEncodingOptions() & JSON_UNESCAPED_SLASHES);
     }
 
     /**
      * @param mixed[] $structure
-     * @param array<string, \Generator<int|string, mixed> $generics
+     * @param array<string, Generator<int|string, mixed> $generics
      */
     private function createSendResponse(
         array $structure,
@@ -97,9 +100,9 @@ class StreamedJsonResponseTest extends TestCase
     }
 
     /**
-     * @return \Generator<int, string>
+     * @return Generator<int, string>
      */
-    private function generatorSimple(string $test): \Generator
+    private function generatorSimple(string $test): Generator
     {
         yield $test.' 1';
         yield $test.' 2';
@@ -107,9 +110,9 @@ class StreamedJsonResponseTest extends TestCase
     }
 
     /**
-     * @return \Generator<int, array{title: string}>
+     * @return Generator<int, array{title: string}>
      */
-    private function generatorArray(string $test): \Generator
+    private function generatorArray(string $test): Generator
     {
         yield ['title' => $test.' 1'];
         yield ['title' => $test.' 2'];

@@ -11,10 +11,14 @@
 
 namespace Symfony\Component\HttpFoundation;
 
+use Generator;
+
 use function array_keys;
 use function explode;
 use function flush;
 use function json_encode;
+
+use const JSON_THROW_ON_ERROR;
 
 /**
  * StreamedJsonResponse represents a streamed HTTP response for JSON.
@@ -36,7 +40,7 @@ class StreamedJsonResponse extends StreamedResponse
 
     /**
      * @param mixed[] $structure
-     * @param array<string, \Generator<int|string, mixed> $generics
+     * @param array<string, Generator<int|string, mixed> $generics
      */
     public function __construct(
         private readonly array $structure,
@@ -48,7 +52,7 @@ class StreamedJsonResponse extends StreamedResponse
         parent::__construct(function () {
             $keys = array_keys($this->generics);
 
-            $jsonEncodingOptions = \JSON_THROW_ON_ERROR | $this->getEncodingOptions();
+            $jsonEncodingOptions = JSON_THROW_ON_ERROR | $this->getEncodingOptions();
             $structureText = json_encode($this->structure, $jsonEncodingOptions);
 
             foreach ($keys as $key) {
