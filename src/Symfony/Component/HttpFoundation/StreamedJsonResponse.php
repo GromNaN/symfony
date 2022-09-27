@@ -45,9 +45,9 @@ use const JSON_THROW_ON_ERROR;
  *     // array of generators with replace identifier used as key
  *     [
  *         '__articles__' => function (): \Generator { // any method or function returning a Generator
- *              yield 'Article 1';
- *              yield 'Article 2';
- *              yield 'Article 3';
+ *              yield ['title' => 'Article 1'];
+ *              yield ['title' => 'Article 2'];
+ *              yield ['title' => 'Article 3'];
  *         },
  *     ]
  * );
