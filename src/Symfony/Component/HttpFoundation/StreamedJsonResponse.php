@@ -137,9 +137,13 @@ class StreamedJsonResponse extends StreamedResponse
 
     /**
      * Returns the flush size.
+     *
+     * @return $this
      */
-    public function setFlushSize(int $flushSize): void
+    public function setFlushSize(int $flushSize): static
     {
         $this->flushSize = $flushSize;
+
+        return $this;
     }
 }
