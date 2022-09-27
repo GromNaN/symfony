@@ -65,12 +65,12 @@ class StreamedJsonResponse extends StreamedResponse
 
                     echo json_encode($array, $jsonEncodingOptions);
                     ++$count;
+
+                    if (0 === $count % $this->flushSize) {
+                        flush();
+                    }
                 }
                 echo ']';
-
-                if (0 === $count % $this->flushSize) {
-                    flush();
-                }
 
                 $structureText = $end;
             }
