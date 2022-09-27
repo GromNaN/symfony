@@ -43,14 +43,14 @@ class StreamedJsonResponse extends StreamedResponse
         int $status = 200,
         array $headers = [],
     ) {
-        parent::__construct(function() {
-            $keys = \array_keys($this->generics);
+        parent::__construct(function () {
+            $keys = array_keys($this->generics);
 
             $jsonEncodingOptions = \JSON_THROW_ON_ERROR | $this->getEncodingOptions();
-            $structureText = \json_encode($this->structure, $jsonEncodingOptions);
+            $structureText = json_encode($this->structure, $jsonEncodingOptions);
 
             foreach ($keys as $key) {
-                [$start, $end] = \explode('"' . $key . '"', $structureText, 2);
+                [$start, $end] = explode('"'.$key.'"', $structureText, 2);
 
                 // send first and between parts of the structure
                 echo $start;
@@ -58,17 +58,17 @@ class StreamedJsonResponse extends StreamedResponse
                 $count = 0;
                 echo '[';
                 foreach ($this->generics[$key] as $array) {
-                    if ($count !== 0) {
+                    if (0 !== $count) {
                         // if not first element of the generic a separator is required between the elements
                         echo ',';
                     }
 
-                    echo \json_encode($array, $jsonEncodingOptions);
+                    echo json_encode($array, $jsonEncodingOptions);
                     ++$count;
                 }
                 echo ']';
 
-                if ($count % $this->flushSize === 0) {
+                if (0 === $count % $this->flushSize) {
                     flush();
                 }
 
@@ -103,8 +103,6 @@ class StreamedJsonResponse extends StreamedResponse
 
     /**
      * Sets the flush size.
-     *
-     * @return int
      */
     public function getFlushSize(): int
     {
@@ -113,8 +111,6 @@ class StreamedJsonResponse extends StreamedResponse
 
     /**
      * Returns the flush size.
-     *
-     * @param int $flushSize
      */
     public function setFlushSize(int $flushSize): void
     {

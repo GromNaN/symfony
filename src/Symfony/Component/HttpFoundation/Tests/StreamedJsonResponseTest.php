@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\StreamedJsonResponse;
 
 class StreamedJsonResponseTest extends TestCase
 {
-    public function testResponseSimpleList(): void
+    public function testResponseSimpleList()
     {
         $content = $this->createSendResponse(
             [
@@ -34,7 +34,7 @@ class StreamedJsonResponseTest extends TestCase
         $this->assertSame('{"_embedded":{"articles":["Article 1","Article 2","Article 3"],"news":["News 1","News 2","News 3"]}}', $content);
     }
 
-    public function testResponseObjectsList(): void
+    public function testResponseObjectsList()
     {
         $content = $this->createSendResponse(
             [
@@ -50,21 +50,21 @@ class StreamedJsonResponseTest extends TestCase
         $this->assertSame('{"_embedded":{"articles":[{"title":"Article 1"},{"title":"Article 2"},{"title":"Article 3"}]}}', $content);
     }
 
-    public function testResponseStatusCode(): void
+    public function testResponseStatusCode()
     {
         $response = new StreamedJsonResponse([], [], 201);
 
         $this->assertSame(201, $response->getStatusCode());
     }
 
-    public function testResponseHeaders(): void
+    public function testResponseHeaders()
     {
         $response = new StreamedJsonResponse([], [], 200, ['X-Test' => 'Test']);
 
         $this->assertSame('Test', $response->headers->get('X-Test'));
     }
 
-    public function testFlushSize(): void
+    public function testFlushSize()
     {
         $response = new StreamedJsonResponse([], []);
         $response->setFlushSize(50);
@@ -72,7 +72,7 @@ class StreamedJsonResponseTest extends TestCase
         $this->assertSame(50, $response->getFlushSize());
     }
 
-    public function testEncodingOptions(): void
+    public function testEncodingOptions()
     {
         $response = new StreamedJsonResponse([], []);
         $response->setEncodingOptions(\JSON_UNESCAPED_SLASHES);
@@ -101,9 +101,9 @@ class StreamedJsonResponseTest extends TestCase
      */
     private function generatorSimple(string $test): \Generator
     {
-        yield $test . ' 1';
-        yield $test . ' 2';
-        yield $test . ' 3';
+        yield $test.' 1';
+        yield $test.' 2';
+        yield $test.' 3';
     }
 
     /**
@@ -111,8 +111,8 @@ class StreamedJsonResponseTest extends TestCase
      */
     private function generatorArray(string $test): \Generator
     {
-        yield ['title' => $test . ' 1'];
-        yield ['title' => $test . ' 2'];
-        yield ['title' => $test . ' 3'];
+        yield ['title' => $test.' 1'];
+        yield ['title' => $test.' 2'];
+        yield ['title' => $test.' 3'];
     }
 }
