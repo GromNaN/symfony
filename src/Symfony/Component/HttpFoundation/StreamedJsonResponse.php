@@ -34,8 +34,6 @@ class StreamedJsonResponse extends StreamedResponse
 
     protected int $encodingOptions = self::DEFAULT_ENCODING_OPTIONS;
 
-    protected int $flushSize = 500;
-
     /**
      * @param mixed[] $structure
      * @param array<string, \Generator<int|string, mixed> $generics
@@ -45,6 +43,7 @@ class StreamedJsonResponse extends StreamedResponse
         private readonly array $generics,
         int $status = 200,
         array $headers = [],
+        protected int $flushSize = 500,
     ) {
         parent::__construct(function () {
             $keys = array_keys($this->generics);
