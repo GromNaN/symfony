@@ -11,11 +11,11 @@
 
 namespace Symfony\Component\HttpFoundation\Tests;
 
+use const JSON_UNESCAPED_SLASHES;
+
 use Generator;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\StreamedJsonResponse;
-
-use const JSON_UNESCAPED_SLASHES;
 
 class StreamedJsonResponseTest extends TestCase
 {
