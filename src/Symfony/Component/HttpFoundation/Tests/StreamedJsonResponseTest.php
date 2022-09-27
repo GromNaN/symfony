@@ -107,7 +107,7 @@ class StreamedJsonResponseTest extends TestCase
     }
 
     /**
-     * @return \Generator<int, string>
+     * @return \Generator<int, array{title: string}>
      */
     private function generatorArray(string $test): \Generator
     {
