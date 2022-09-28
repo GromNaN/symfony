@@ -46,7 +46,7 @@ class StreamedJsonResponse extends StreamedResponse
 {
     public const DEFAULT_ENCODING_OPTIONS = JsonResponse::DEFAULT_ENCODING_OPTIONS;
 
-    protected int $encodingOptions = self::DEFAULT_ENCODING_OPTIONS;
+    private int $encodingOptions = self::DEFAULT_ENCODING_OPTIONS;
 
     /**
      * @param mixed[] $structure Basic structure of the JSON containing replace identifiers
