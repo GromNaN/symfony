@@ -49,12 +49,15 @@ class StreamedJsonResponse extends StreamedResponse
     protected int $encodingOptions = self::DEFAULT_ENCODING_OPTIONS;
 
     /**
-     * @param mixed[] $structure
-     * @param array<string, \Generator<int|string, mixed> $generics
+     * @param mixed[] $structure Basic structure of the JSON containing replace identifiers
+     * @param array<string, iterable<mixed> $generators One or multiple generators indexed by replace identifier
+     * @param int $status The HTTP status code (200 "OK" by default)
+     * @param array<string, string|string[]> $headers An array of HTTP headers
+     * @param int $flushSize After every which item of a generator the flush function should be called
      */
     public function __construct(
         private readonly array $structure,
-        private readonly array $generics,
+        private readonly array $generators,
         int $status = 200,
         array $headers = [],
         private int $flushSize = 500,
@@ -68,7 +71,7 @@ class StreamedJsonResponse extends StreamedResponse
 
     private function stream(): void
     {
-        $keys = array_keys($this->generics);
+        $keys = array_keys($this->generators);
 
         $jsonEncodingOptions = \JSON_THROW_ON_ERROR | $this->getEncodingOptions();
         $structureText = json_encode($this->structure, $jsonEncodingOptions);
@@ -81,7 +84,7 @@ class StreamedJsonResponse extends StreamedResponse
 
             $count = 0;
             echo '[';
-            foreach ($this->generics[$key] as $array) {
+            foreach ($this->generators[$key] as $array) {
                 if (0 !== $count) {
                     // if not first element of the generic a separator is required between the elements
                     echo ',';

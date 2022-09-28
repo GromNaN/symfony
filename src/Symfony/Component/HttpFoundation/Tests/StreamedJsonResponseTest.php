@@ -50,6 +50,22 @@ class StreamedJsonResponseTest extends TestCase
         $this->assertSame('{"_embedded":{"articles":[{"title":"Article 1"},{"title":"Article 2"},{"title":"Article 3"}]}}', $content);
     }
 
+    public function testResponseWithArray()
+    {
+        $content = $this->createSendResponse(
+            [
+                '_embedded' => [
+                    'articles' => '__articles__',
+                ],
+            ],
+            [
+                '__articles__' => ['Article 1', 'Article 2', 'Article 3'],
+            ],
+        );
+
+        $this->assertSame('{"_embedded":{"articles":["Article 1","Article 2","Article 3"]}}', $content);
+    }
+
     public function testResponseStatusCode()
     {
         $response = new StreamedJsonResponse([], [], 201);
