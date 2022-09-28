@@ -61,7 +61,7 @@ class StreamedJsonResponse extends StreamedResponse
         array $headers = [],
         private int $flushSize = 500,
     ) {
-        parent::__construct(fn() => $this->stream(), $status, $headers);
+        parent::__construct(fn () => $this->stream(), $status, $headers);
 
         if (!$this->headers->get('Content-Type')) {
             $this->headers->set('Content-Type', 'application/json');
@@ -72,7 +72,7 @@ class StreamedJsonResponse extends StreamedResponse
     {
         $keys = array_keys($this->generics);
 
-        $jsonEncodingOptions = JSON_THROW_ON_ERROR | $this->getEncodingOptions();
+        $jsonEncodingOptions = \JSON_THROW_ON_ERROR | $this->getEncodingOptions();
         $structureText = json_encode($this->structure, $jsonEncodingOptions);
 
         foreach ($keys as $key) {
