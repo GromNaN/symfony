@@ -11,7 +11,6 @@
 
 namespace Symfony\Component\HttpFoundation\Tests;
 
-use Generator;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\StreamedJsonResponse;
 
@@ -90,7 +89,7 @@ class StreamedJsonResponseTest extends TestCase
 
     /**
      * @param mixed[] $structure
-     * @param array<string, Generator<int|string, mixed> $generics
+     * @param array<string, \Generator<int|string, mixed> $generics
      */
     private function createSendResponse(
         array $structure,
@@ -105,9 +104,9 @@ class StreamedJsonResponseTest extends TestCase
     }
 
     /**
-     * @return Generator<int, string>
+     * @return \Generator<int, string>
      */
-    private function generatorSimple(string $test): Generator
+    private function generatorSimple(string $test): \Generator
     {
         yield $test.' 1';
         yield $test.' 2';
@@ -115,9 +114,9 @@ class StreamedJsonResponseTest extends TestCase
     }
 
     /**
-     * @return Generator<int, array{title: string}>
+     * @return \Generator<int, array{title: string}>
      */
-    private function generatorArray(string $test): Generator
+    private function generatorArray(string $test): \Generator
     {
         yield ['title' => $test.' 1'];
         yield ['title' => $test.' 2'];

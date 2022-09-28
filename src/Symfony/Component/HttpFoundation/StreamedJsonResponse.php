@@ -11,8 +11,6 @@
 
 namespace Symfony\Component\HttpFoundation;
 
-use Generator;
-
 /**
  * StreamedJsonResponse represents a streamed HTTP response for JSON.
  *
@@ -52,7 +50,7 @@ class StreamedJsonResponse extends StreamedResponse
 
     /**
      * @param mixed[] $structure
-     * @param array<string, Generator<int|string, mixed> $generics
+     * @param array<string, \Generator<int|string, mixed> $generics
      */
     public function __construct(
         private readonly array $structure,
