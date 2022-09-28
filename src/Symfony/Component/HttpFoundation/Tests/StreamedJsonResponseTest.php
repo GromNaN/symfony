@@ -12,9 +12,6 @@
 namespace Symfony\Component\HttpFoundation\Tests;
 
 use Generator;
-
-use const JSON_UNESCAPED_SLASHES;
-
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\StreamedJsonResponse;
 
@@ -86,9 +83,9 @@ class StreamedJsonResponseTest extends TestCase
     public function testEncodingOptions()
     {
         $response = new StreamedJsonResponse([], []);
-        $response->setEncodingOptions(JSON_UNESCAPED_SLASHES);
+        $response->setEncodingOptions(\JSON_UNESCAPED_SLASHES);
 
-        $this->assertSame(JSON_UNESCAPED_SLASHES, $response->getEncodingOptions() & JSON_UNESCAPED_SLASHES);
+        $this->assertSame(\JSON_UNESCAPED_SLASHES, $response->getEncodingOptions() & \JSON_UNESCAPED_SLASHES);
     }
 
     /**
