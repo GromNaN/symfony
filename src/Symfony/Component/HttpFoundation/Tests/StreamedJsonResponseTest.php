@@ -68,6 +68,13 @@ class StreamedJsonResponseTest extends TestCase
         $this->assertSame('Test', $response->headers->get('X-Test'));
     }
 
+    public function testCustomContentType()
+    {
+        $response = new StreamedJsonResponse([], [], 200, ['Content-Type' => 'application/json+stream']);
+
+        $this->assertSame('application/json+stream', $response->headers->get('Content-Type'));
+    }
+
     public function testFlushSize()
     {
         $response = new StreamedJsonResponse([], []);

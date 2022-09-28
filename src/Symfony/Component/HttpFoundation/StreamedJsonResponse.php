@@ -11,15 +11,7 @@
 
 namespace Symfony\Component\HttpFoundation;
 
-use function array_keys;
-use function explode;
-use function flush;
-
 use Generator;
-
-use function json_encode;
-
-use const JSON_THROW_ON_ERROR;
 
 /**
  * StreamedJsonResponse represents a streamed HTTP response for JSON.
@@ -69,42 +61,47 @@ class StreamedJsonResponse extends StreamedResponse
         array $headers = [],
         private int $flushSize = 500,
     ) {
-        parent::__construct(function () {
-            $keys = array_keys($this->generics);
+        parent::__construct(fn() => $this->stream(), $status, $headers);
 
-            $jsonEncodingOptions = JSON_THROW_ON_ERROR | $this->getEncodingOptions();
-            $structureText = json_encode($this->structure, $jsonEncodingOptions);
+        if (!$this->headers->get('Content-Type')) {
+            $this->headers->set('Content-Type', 'application/json');
+        }
+    }
 
-            foreach ($keys as $key) {
-                [$start, $end] = explode('"'.$key.'"', $structureText, 2);
+    private function stream(): void
+    {
+        $keys = array_keys($this->generics);
 
-                // send first and between parts of the structure
-                echo $start;
+        $jsonEncodingOptions = JSON_THROW_ON_ERROR | $this->getEncodingOptions();
+        $structureText = json_encode($this->structure, $jsonEncodingOptions);
 
-                $count = 0;
-                echo '[';
-                foreach ($this->generics[$key] as $array) {
-                    if (0 !== $count) {
-                        // if not first element of the generic a separator is required between the elements
-                        echo ',';
-                    }
+        foreach ($keys as $key) {
+            [$start, $end] = explode('"'.$key.'"', $structureText, 2);
 
-                    echo json_encode($array, $jsonEncodingOptions);
-                    ++$count;
+            // send first and between parts of the structure
+            echo $start;
 
-                    if (0 === $count % $this->flushSize) {
-                        flush();
-                    }
+            $count = 0;
+            echo '[';
+            foreach ($this->generics[$key] as $array) {
+                if (0 !== $count) {
+                    // if not first element of the generic a separator is required between the elements
+                    echo ',';
                 }
-                echo ']';
 
-                $structureText = $end;
+                echo json_encode($array, $jsonEncodingOptions);
+                ++$count;
+
+                if (0 === $count % $this->flushSize) {
+                    flush();
+                }
             }
+            echo ']';
 
-            echo $structureText; // send the after part of the structure as last
-        }, $status, $headers);
+            $structureText = $end;
+        }
 
-        $this->headers->set('Content-Type', 'application/json');
+        echo $structureText; // send the after part of the structure as last
     }
 
     /**
