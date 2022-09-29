@@ -107,10 +107,8 @@ class StreamedJsonResponseTest extends TestCase
      * @param mixed[] $structure
      * @param array<string, \Generator<int|string, mixed> $generics
      */
-    private function createSendResponse(
-        array $structure,
-        array $generics,
-    ): string {
+    private function createSendResponse(array $structure, array $generics): string
+    {
         $response = new StreamedJsonResponse($structure, $generics);
 
         ob_start();
