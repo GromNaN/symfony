@@ -21,13 +21,9 @@ class StreamedJsonResponseTest extends TestCase
         $content = $this->createSendResponse(
             [
                 '_embedded' => [
-                    'articles' => '__articles__',
-                    'news' => '__news__',
+                    'articles' => $this->generatorSimple('Article'),
+                    'news' => $this->generatorSimple('News'),
                 ],
-            ],
-            [
-                '__articles__' => $this->generatorSimple('Article'),
-                '__news__' => $this->generatorSimple('News'),
             ],
         );
 
@@ -39,27 +35,22 @@ class StreamedJsonResponseTest extends TestCase
         $content = $this->createSendResponse(
             [
                 '_embedded' => [
-                    'articles' => '__articles__',
+                    'articles' => $this->generatorArray('Article'),
                 ],
-            ],
-            [
-                '__articles__' => $this->generatorArray('Article'),
             ],
         );
 
         $this->assertSame('{"_embedded":{"articles":[{"title":"Article 1"},{"title":"Article 2"},{"title":"Article 3"}]}}', $content);
     }
 
-    public function testResponseWithArray()
+    public function testResponseWithoutAnGenerator()
     {
+        // why it is not the designed usage for a good DX all kind of iterables should be supported
         $content = $this->createSendResponse(
             [
                 '_embedded' => [
-                    'articles' => '__articles__',
+                    'articles' => ['Article 1', 'Article 2', 'Article 3'],
                 ],
-            ],
-            [
-                '__articles__' => ['Article 1', 'Article 2', 'Article 3'],
             ],
         );
 
@@ -68,28 +59,28 @@ class StreamedJsonResponseTest extends TestCase
 
     public function testResponseStatusCode()
     {
-        $response = new StreamedJsonResponse([], [], 201);
+        $response = new StreamedJsonResponse([], 201);
 
         $this->assertSame(201, $response->getStatusCode());
     }
 
     public function testResponseHeaders()
     {
-        $response = new StreamedJsonResponse([], [], 200, ['X-Test' => 'Test']);
+        $response = new StreamedJsonResponse([], 200, ['X-Test' => 'Test']);
 
         $this->assertSame('Test', $response->headers->get('X-Test'));
     }
 
     public function testCustomContentType()
     {
-        $response = new StreamedJsonResponse([], [], 200, ['Content-Type' => 'application/json+stream']);
+        $response = new StreamedJsonResponse([], 200, ['Content-Type' => 'application/json+stream']);
 
         $this->assertSame('application/json+stream', $response->headers->get('Content-Type'));
     }
 
     public function testFlushSize()
     {
-        $response = new StreamedJsonResponse([], []);
+        $response = new StreamedJsonResponse([]);
         $response->setFlushSize(50);
 
         $this->assertSame(50, $response->getFlushSize());
@@ -97,7 +88,7 @@ class StreamedJsonResponseTest extends TestCase
 
     public function testEncodingOptions()
     {
-        $response = new StreamedJsonResponse([], []);
+        $response = new StreamedJsonResponse([]);
         $response->setEncodingOptions(\JSON_UNESCAPED_SLASHES);
 
         $this->assertSame(\JSON_UNESCAPED_SLASHES, $response->getEncodingOptions() & \JSON_UNESCAPED_SLASHES);
@@ -105,11 +96,10 @@ class StreamedJsonResponseTest extends TestCase
 
     /**
      * @param mixed[] $structure
-     * @param array<string, \Generator<int|string, mixed> $generics
      */
-    private function createSendResponse(array $structure, array $generics): string
+    private function createSendResponse(array $data): string
     {
-        $response = new StreamedJsonResponse($structure, $generics);
+        $response = new StreamedJsonResponse($data);
 
         ob_start();
         $response->send();

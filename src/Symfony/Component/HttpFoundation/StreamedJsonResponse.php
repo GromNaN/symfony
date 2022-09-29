@@ -25,21 +25,20 @@ namespace Symfony\Component\HttpFoundation;
  *
  * Example usage:
  *
+ * function loadArticles(): \Generator
+ *     // some streamed loading
+ *     yield ['title' => 'Article 1'];
+ *     yield ['title' => 'Article 2'];
+ *     yield ['title' => 'Article 3'];
+ * }),
+ *
  * $response = new StreamedJsonResponse(
- *     // json structure with replace identifiers
+ *     // json structure with generators in which will be streamed
  *     [
  *         '_embedded' => [
- *             'articles' => '__articles__',
+ *             'articles' => loadArticles(), // any generator which you want to stream as list of data
  *         ],
  *     ],
- *     // array of generators with replace identifier used as key
- *     [
- *         '__articles__' => (function (): \Generator { // any method or function returning a Generator
- *              yield ['title' => 'Article 1'];
- *              yield ['title' => 'Article 2'];
- *              yield ['title' => 'Article 3'];
- *         })(),
- *     ]
  * );
  */
 class StreamedJsonResponse extends StreamedResponse
@@ -49,18 +48,16 @@ class StreamedJsonResponse extends StreamedResponse
     private int $encodingOptions = self::DEFAULT_ENCODING_OPTIONS;
 
     /**
-     * @param mixed[]                        $structure  Basic structure of the JSON containing replace identifiers
-     * @param array<string, iterable<mixed>  $generators One or multiple generators indexed by replace identifier
+     * @param mixed[]                        $data       JSON Data containing PHP generators which will be streamed as list of data
      * @param int                            $status     The HTTP status code (200 "OK" by default)
      * @param array<string, string|string[]> $headers    An array of HTTP headers
      * @param int                            $flushSize  After every which item of a generator the flush function should be called
      */
     public function __construct(
-        private readonly array $structure,
-        private readonly array $generators,
+        private readonly array $data,
         int $status = 200,
         array $headers = [],
-        private int $flushSize = 500,
+        private int $flushSize = 100,
     ) {
         parent::__construct($this->stream(...), $status, $headers);
 
@@ -71,10 +68,24 @@ class StreamedJsonResponse extends StreamedResponse
 
     private function stream(): void
     {
-        $keys = array_keys($this->generators);
+        $generators = [];
+        $structure = $this->data;
+
+        \array_walk_recursive($structure, function (&$item, $key)  use (&$generators)
+        {
+            if ($item instanceof \Generator) {
+                // using uniqid to avoid conflict with eventually other data in the structure
+                $placeholder = \uniqid('__placeholder_', true);
+                $generators[$placeholder] = $item;
+
+                $item = $placeholder;
+            }
+        });
+
+        $keys = array_keys($generators);
 
         $jsonEncodingOptions = \JSON_THROW_ON_ERROR | $this->getEncodingOptions();
-        $structureText = json_encode($this->structure, $jsonEncodingOptions);
+        $structureText = json_encode($structure, $jsonEncodingOptions);
 
         foreach ($keys as $key) {
             [$start, $end] = explode('"'.$key.'"', $structureText, 2);
@@ -84,7 +95,7 @@ class StreamedJsonResponse extends StreamedResponse
 
             $count = 0;
             echo '[';
-            foreach ($this->generators[$key] as $array) {
+            foreach ($generators[$key] as $array) {
                 if (0 !== $count) {
                     // if not first element of the generic a separator is required between the elements
                     echo ',';
