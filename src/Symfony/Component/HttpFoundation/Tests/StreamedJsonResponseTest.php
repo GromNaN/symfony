@@ -95,7 +95,7 @@ class StreamedJsonResponseTest extends TestCase
     }
 
     /**
-     * @param mixed[] $structure
+     * @param mixed[] $data
      */
     private function createSendResponse(array $data): string
     {

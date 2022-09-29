@@ -48,10 +48,10 @@ class StreamedJsonResponse extends StreamedResponse
     private int $encodingOptions = self::DEFAULT_ENCODING_OPTIONS;
 
     /**
-     * @param mixed[]                        $data       JSON Data containing PHP generators which will be streamed as list of data
-     * @param int                            $status     The HTTP status code (200 "OK" by default)
-     * @param array<string, string|string[]> $headers    An array of HTTP headers
-     * @param int                            $flushSize  After every which item of a generator the flush function should be called
+     * @param mixed[]                        $data      JSON Data containing PHP generators which will be streamed as list of data
+     * @param int                            $status    The HTTP status code (200 "OK" by default)
+     * @param array<string, string|string[]> $headers   An array of HTTP headers
+     * @param int                            $flushSize After every which item of a generator the flush function should be called
      */
     public function __construct(
         private readonly array $data,
@@ -71,11 +71,10 @@ class StreamedJsonResponse extends StreamedResponse
         $generators = [];
         $structure = $this->data;
 
-        \array_walk_recursive($structure, function (&$item, $key)  use (&$generators)
-        {
+        array_walk_recursive($structure, function (&$item, $key) use (&$generators) {
             if ($item instanceof \Generator) {
                 // using uniqid to avoid conflict with eventually other data in the structure
-                $placeholder = \uniqid('__placeholder_', true);
+                $placeholder = uniqid('__placeholder_', true);
                 $generators[$placeholder] = $item;
 
                 $item = $placeholder;
