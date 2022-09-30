@@ -72,6 +72,7 @@ class StreamedJsonResponse extends StreamedResponse
         $structure = $this->data;
 
         array_walk_recursive($structure, function (&$item, $key) use (&$generators) {
+            // generators should be used but for better DX all kind of Traversable are supported
             if ($item instanceof \Traversable) {
                 // using uniqid to avoid conflict with eventually other data in the structure
                 $placeholder = uniqid('__placeholder_', true);
