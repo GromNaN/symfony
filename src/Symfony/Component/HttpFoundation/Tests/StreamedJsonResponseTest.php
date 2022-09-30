@@ -57,6 +57,21 @@ class StreamedJsonResponseTest extends TestCase
         $this->assertSame('{"_embedded":{"articles":["Article 1","Article 2","Article 3"]}}', $content);
     }
 
+    public function testResponseWithTraversable()
+    {
+        // why Generators should be used for performance reasons the object should also work with any Traversable
+        // to make things easier for a developer
+        $content = $this->createSendResponse(
+            [
+                '_embedded' => [
+                    'articles' => new \ArrayIterator(['Article 1', 'Article 2', 'Article 3']),
+                ],
+            ],
+        );
+
+        $this->assertSame('{"_embedded":{"articles":["Article 1","Article 2","Article 3"]}}', $content);
+    }
+
     public function testResponseStatusCode()
     {
         $response = new StreamedJsonResponse([], 201);
