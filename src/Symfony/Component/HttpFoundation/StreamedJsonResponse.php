@@ -73,7 +73,7 @@ class StreamedJsonResponse extends StreamedResponse
 
         array_walk_recursive($structure, function (&$item, $key) use (&$generators) {
             // generators should be used but for better DX all kind of Traversable are supported
-            if ($item instanceof \Traversable) {
+            if ($item instanceof \Traversable && !$item instanceof \JsonSerializable) {
                 // using uniqid to avoid conflict with eventually other data in the structure
                 $placeholder = uniqid('__placeholder_', true);
                 $generators[$placeholder] = $item;
@@ -82,26 +82,25 @@ class StreamedJsonResponse extends StreamedResponse
             }
         });
 
-        $keys = array_keys($generators);
-
         $jsonEncodingOptions = \JSON_THROW_ON_ERROR | $this->getEncodingOptions();
         $structureText = json_encode($structure, $jsonEncodingOptions);
 
-        foreach ($keys as $key) {
-            [$start, $end] = explode('"'.$key.'"', $structureText, 2);
+        foreach (array_keys($generators) as $placeholder) {
+            // split structure json by placeholder for stream the before and between part of the generator items
+            [$start, $end] = explode('"'.$placeholder.'"', $structureText, 2);
 
             // send first and between parts of the structure
             echo $start;
 
             $count = 0;
             echo '[';
-            foreach ($generators[$key] as $array) {
+            foreach ($generators[$placeholder] as $item) {
                 if (0 !== $count) {
                     // if not first element of the generic a separator is required between the elements
                     echo ',';
                 }
 
-                echo json_encode($array, $jsonEncodingOptions);
+                echo json_encode($item, $jsonEncodingOptions);
                 ++$count;
 
                 if (0 === $count % $this->flushSize) {
@@ -113,7 +112,7 @@ class StreamedJsonResponse extends StreamedResponse
             $structureText = $end;
         }
 
-        echo $structureText; // send the after part of the structure as last
+        echo $structureText; // send the after part of the structure json as last
     }
 
     /**
