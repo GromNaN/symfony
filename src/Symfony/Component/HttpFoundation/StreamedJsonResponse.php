@@ -93,11 +93,24 @@ class StreamedJsonResponse extends StreamedResponse
             echo $start;
 
             $count = 0;
-            echo '[';
-            foreach ($generators[$placeholder] as $item) {
-                if (0 !== $count) {
+            $startTag = '[';
+            foreach ($generators[$placeholder] as $key => $item) {
+                if (0 === $count) {
+                    // depending of the first elements key the generator is detected as a list or map
+                    // we can not check for a whole list or map because that would hurt the performance
+                    // of the streamed response which is the main goal of this response class
+                    if ($key !== 0) {
+                        $startTag = '{';
+                    }
+
+                    echo $startTag;
+                } else {
                     // if not first element of the generic a separator is required between the elements
                     echo ',';
+                }
+
+                if ($startTag === '{') {
+                    echo json_encode($key, $jsonEncodingOptions) . ':';
                 }
 
                 echo json_encode($item, $jsonEncodingOptions);
@@ -107,7 +120,8 @@ class StreamedJsonResponse extends StreamedResponse
                     flush();
                 }
             }
-            echo ']';
+
+            echo ($startTag === '[' ? ']' : '}');
 
             $structureText = $end;
         }

@@ -57,19 +57,38 @@ class StreamedJsonResponseTest extends TestCase
         $this->assertSame('{"_embedded":{"articles":["Article 1","Article 2","Article 3"]}}', $content);
     }
 
-    public function testResponseWithTraversable()
+    public function testResponseOtherTraversable()
     {
+        $arrayObject = new \ArrayObject(['key' => 'value']);
+
+        $iteratorAggregate = new class implements \IteratorAggregate {
+            public function getIterator(): \Traversable {
+                return new \ArrayIterator(['Article 1', 'Article 2', 'Article 3']);
+            }
+        };
+
+        $jsonSerializeAble = new class implements \IteratorAggregate, \JsonSerializable {
+            public function getIterator(): \Traversable {
+                return new \ArrayIterator(['This should be ignored']);
+            }
+
+            public function jsonSerialize(): mixed
+            {
+                return ['JSON Serialized'];
+            }
+        };
+
         // why Generators should be used for performance reasons the object should also work with any Traversable
         // to make things easier for a developer
         $content = $this->createSendResponse(
             [
-                '_embedded' => [
-                    'articles' => new \ArrayIterator(['Article 1', 'Article 2', 'Article 3']),
-                ],
+                'arrayObject' => $arrayObject,
+                'iteratorAggregate' => $iteratorAggregate,
+                'jsonSerializable' => $jsonSerializeAble,
             ],
         );
 
-        $this->assertSame('{"_embedded":{"articles":["Article 1","Article 2","Article 3"]}}', $content);
+        $this->assertSame('{"arrayObject":{"key":"value"},"iteratorAggregate":["Article 1","Article 2","Article 3"],"jsonSerializable":["JSON Serialized"]}', $content);
     }
 
     public function testResponseStatusCode()
