@@ -43,7 +43,7 @@ class StreamedJsonResponseTest extends TestCase
         $this->assertSame('{"_embedded":{"articles":[{"title":"Article 1"},{"title":"Article 2"},{"title":"Article 3"}]}}', $content);
     }
 
-    public function testResponseWithoutAnGenerator()
+    public function testResponseWithoutGenerator()
     {
         // why it is not the designed usage for a good DX all kind of iterables should be supported
         $content = $this->createSendResponse(
@@ -55,6 +55,47 @@ class StreamedJsonResponseTest extends TestCase
         );
 
         $this->assertSame('{"_embedded":{"articles":["Article 1","Article 2","Article 3"]}}', $content);
+    }
+
+    public function testResponseWithPlaceholder()
+    {
+        // the placeholder must not conflict with generator injection
+        $content = $this->createSendResponse(
+            [
+                '_embedded' => [
+                    'articles' => $this->generatorArray('Article'),
+                    'placeholder' => '__symfony_json__',
+                    'news' => $this->generatorSimple('News'),
+                ],
+                'placeholder' => '__symfony_json__',
+            ],
+        );
+
+        $this->assertSame('{"_embedded":{"articles":[{"title":"Article 1"},{"title":"Article 2"},{"title":"Article 3"}],"placeholder":"__symfony_json__","news":["News 1","News 2","News 3"]},"placeholder":"__symfony_json__"}', $content);
+    }
+
+    public function testResponseWithMixedKeyType()
+    {
+        $content = $this->createSendResponse(
+            [
+                '_embedded' => [
+                    'list' => (function (): \Generator {
+                        yield 0 => 'test';
+                        yield 'key' => 'value';
+                    })(),
+                    'map' => (function (): \Generator {
+                        yield 'key' => 'value';
+                        yield 0 => 'test';
+                    })(),
+                    'integer' => (function (): \Generator {
+                        yield 1 => 'one';
+                        yield 3 => 'three';
+                    })(),
+                ],
+            ]
+        );
+
+        $this->assertSame('{"_embedded":{"list":["test","value"],"map":{"key":"value","0":"test"},"integer":{"1":"one","3":"three"}}}', $content);
     }
 
     public function testResponseOtherTraversable()
@@ -122,10 +163,24 @@ class StreamedJsonResponseTest extends TestCase
 
     public function testEncodingOptions()
     {
-        $response = new StreamedJsonResponse([]);
-        $response->setEncodingOptions(\JSON_UNESCAPED_SLASHES);
+        $response = new StreamedJsonResponse([
+            '_embedded' => [
+                'count' => '2', // options are applied to the initial json encode
+                'values' => (function (): \Generator {
+                    yield "with/unescaped/slash" => 'With/a/slash'; // options are applied to key and values
+                    yield '3' => '3'; // numeric check for value, but not for the key
+                })(),
+            ],
+        ]);
+        $response->setEncodingOptions(\JSON_UNESCAPED_SLASHES | \JSON_NUMERIC_CHECK);
 
         $this->assertSame(\JSON_UNESCAPED_SLASHES, $response->getEncodingOptions() & \JSON_UNESCAPED_SLASHES);
+
+        ob_start();
+        $response->send();
+        $content = ob_get_clean();
+
+        $this->assertSame('{"_embedded":{"count":2,"values":{"with/unescaped/slash":"With/a/slash","3":3}}}', $content);
     }
 
     /**

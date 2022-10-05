@@ -44,6 +44,7 @@ namespace Symfony\Component\HttpFoundation;
 class StreamedJsonResponse extends StreamedResponse
 {
     public const DEFAULT_ENCODING_OPTIONS = JsonResponse::DEFAULT_ENCODING_OPTIONS;
+    private const PLACEHOLDER = '__symfony_json__';
 
     private int $encodingOptions = self::DEFAULT_ENCODING_OPTIONS;
 
@@ -71,62 +72,60 @@ class StreamedJsonResponse extends StreamedResponse
         $generators = [];
         $structure = $this->data;
 
-        array_walk_recursive($structure, function (&$item, $key) use (&$generators) {
+        array_walk_recursive($structure, function (&$item) use (&$generators) {
             // generators should be used but for better DX all kind of Traversable are supported
             if ($item instanceof \Traversable && !$item instanceof \JsonSerializable) {
-                // using uniqid to avoid conflict with eventually other data in the structure
-                $placeholder = uniqid('__placeholder_', true);
-                $generators[$placeholder] = $item;
-
-                $item = $placeholder;
+                $generators[] = $item;
+                $item = self::PLACEHOLDER;
+            } elseif (self::PLACEHOLDER === $item) {
+                $generators[] = $item;
             }
         });
 
         $jsonEncodingOptions = \JSON_THROW_ON_ERROR | $this->getEncodingOptions();
-        $structureText = json_encode($structure, $jsonEncodingOptions);
+        $keyEncodingOptions = $jsonEncodingOptions & ~\JSON_NUMERIC_CHECK;
+        $jsonParts = explode('"'.self::PLACEHOLDER.'"', json_encode($structure, $jsonEncodingOptions));
 
-        foreach (array_keys($generators) as $placeholder) {
-            // split structure json by placeholder for stream the before and between part of the generator items
-            [$start, $end] = explode('"'.$placeholder.'"', $structureText, 2);
+        echo $jsonParts[0];
 
-            // send first and between parts of the structure
-            echo $start;
+        foreach ($generators as $index => $generator) {
+            if (self::PLACEHOLDER === $generator) {
+                echo json_encode(self::PLACEHOLDER, $jsonEncodingOptions);
+            } else {
+                $count = 0;
+                $startTag = '[';
+                foreach ($generator as $key => $item) {
+                    if (0 === $count) {
+                        // depending of the first elements key the generator is detected as a list or map
+                        // we can not check for a whole list or map because that would hurt the performance
+                        // of the streamed response which is the main goal of this response class
+                        if ($key !== 0) {
+                            $startTag = '{';
+                        }
 
-            $count = 0;
-            $startTag = '[';
-            foreach ($generators[$placeholder] as $key => $item) {
-                if (0 === $count) {
-                    // depending of the first elements key the generator is detected as a list or map
-                    // we can not check for a whole list or map because that would hurt the performance
-                    // of the streamed response which is the main goal of this response class
-                    if ($key !== 0) {
-                        $startTag = '{';
+                        echo $startTag;
+                    } else {
+                        // if not first element of the generic a separator is required between the elements
+                        echo ',';
                     }
 
-                    echo $startTag;
-                } else {
-                    // if not first element of the generic a separator is required between the elements
-                    echo ',';
+                    if ($startTag === '{') {
+                        echo json_encode((string)$key, $keyEncodingOptions) . ':';
+                    }
+
+                    echo json_encode($item, $jsonEncodingOptions);
+                    ++$count;
+
+                    if (0 === $count % $this->flushSize) {
+                        flush();
+                    }
                 }
 
-                if ($startTag === '{') {
-                    echo json_encode($key, $jsonEncodingOptions) . ':';
-                }
-
-                echo json_encode($item, $jsonEncodingOptions);
-                ++$count;
-
-                if (0 === $count % $this->flushSize) {
-                    flush();
-                }
+                echo($startTag === '[' ? ']' : '}');
             }
 
-            echo ($startTag === '[' ? ']' : '}');
-
-            $structureText = $end;
+            echo $jsonParts[$index + 1];
         }
-
-        echo $structureText; // send the after part of the structure json as last
     }
 
     /**
