@@ -127,10 +127,37 @@ class ParameterBag implements \IteratorAggregate, \Countable
 
     /**
      * Returns the parameter value converted to integer.
+     * @deprecated Returned values are not reliable for arrays. Use "getInteger()" instead.
      */
     public function getInt(string $key, int $default = 0): int
     {
+        trigger_deprecation('symfony/http-foundation', '6.2', 'Values returned by "%s()" are not reliable. Use "getInteger()" instead.', __METHOD__);
+
         return (int) $this->get($key, $default);
+    }
+
+    /**
+     * Returns the parameter value converted to integer. Default is returned for missing or invalid data.
+     */
+    public function getInteger(string $key, int $default = 0): int
+    {
+        $value = $this->filter($key, $default, \FILTER_VALIDATE_INT, ['flags' => \FILTER_REQUIRE_SCALAR]);
+
+        return false === $value ? $default : $value;
+    }
+
+    /**
+     * Returns the parameter value converted to string. Default is returned for missing or invalid data.
+     */
+    public function getString(string $key, string $default = ''): string
+    {
+        $value = $this->get($key, $default);
+
+        if (is_scalar($value) || $value instanceof \Stringable) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 
     /**

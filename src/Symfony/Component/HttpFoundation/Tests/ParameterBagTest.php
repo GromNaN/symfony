@@ -12,11 +12,14 @@
 namespace Symfony\Component\HttpFoundation\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Bridge\PhpUnit\ExpectDeprecationTrait;
 use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpFoundation\ParameterBag;
 
 class ParameterBagTest extends TestCase
 {
+    use ExpectDeprecationTrait;
+
     public function testConstructor()
     {
         $this->testAll();
@@ -133,12 +136,42 @@ class ParameterBagTest extends TestCase
         $this->assertEquals('', $bag->getDigits('unknown'), '->getDigits() returns empty string if a parameter is not defined');
     }
 
+    /**
+     * @group legacy
+     */
     public function testGetInt()
     {
-        $bag = new ParameterBag(['digits' => '0123']);
+        $this->expectDeprecation('Since symfony/http-foundation 6.2: Values returned by "Symfony\Component\HttpFoundation\ParameterBag::getInt()" are not reliable. Use "getInteger()" instead.');
+
+        $bag = new ParameterBag(['digits' => '0123', 'array' => ['5']]);
 
         $this->assertEquals(123, $bag->getInt('digits'), '->getInt() gets a value of parameter as integer');
         $this->assertEquals(0, $bag->getInt('unknown'), '->getInt() returns zero if a parameter is not defined');
+        $this->assertEquals(1, $bag->getInt('array'), '->getInt() returns 1 if a parameter is a non-empty array');
+    }
+
+    public function testGetInteger()
+    {
+        $bag = new ParameterBag(['int' => '123', 'digits' => '0123', 'array' => ['123'], 'string' => 'abc', 'float' => '1.2']);
+
+        $this->assertSame(123, $bag->getInteger('int', 5), '->getInteger() gets a value of parameter as integer');
+        $this->assertSame(5, $bag->getInteger('digits', 5), '->getInteger() returns the default if a parameter is not an integer');
+        $this->assertSame(5, $bag->getInteger('unknown', 5), '->getInteger() returns the default if a parameter is not defined');
+        $this->assertSame(5, $bag->getInteger('array', 5), '->getInteger() returns the default if a parameter is an array');
+        $this->assertSame(5, $bag->getInteger('string', 5), '->getInteger() returns the default if a parameter is not numeric');
+        $this->assertSame(5, $bag->getInteger('float', 5), '->getInteger() returns the default if a parameter is a float');
+    }
+
+    public function testGetString()
+    {
+        $bag = new ParameterBag(['int' => 123, 'digits' => '0123', 'array' => ['123'], 'string' => 'abc', 'float' => 1.2]);
+
+        $this->assertSame('abc', $bag->getString('string', 'default'), '->getInteger() returns a value of a parameter as string');
+        $this->assertSame('123', $bag->getString('int', 'default'), '->getInteger() returns integer casted to string');
+        $this->assertSame('1.2', $bag->getString('float', 'default'), '->getInteger() returns float casted to string');
+        $this->assertSame('0123', $bag->getString('digits', 'default'), '->getInteger() returns the default if a parameter is not an integer');
+        $this->assertSame('default', $bag->getString('unknown', 'default'), '->getInteger() returns the default if a parameter is not defined');
+        $this->assertSame('default', $bag->getString('array', 'default'), '->getInteger() returns the default if a parameter is an array');
     }
 
     public function testFilter()
@@ -225,5 +258,6 @@ class ParameterBagTest extends TestCase
         $this->assertTrue($bag->getBoolean('string_true'), '->getBoolean() gets the string true as boolean true');
         $this->assertFalse($bag->getBoolean('string_false'), '->getBoolean() gets the string false as boolean false');
         $this->assertFalse($bag->getBoolean('unknown'), '->getBoolean() returns false if a parameter is not defined');
+        $this->assertTrue($bag->getBoolean('unknown', true), '->getBoolean() returns default if a parameter is not defined');
     }
 }
