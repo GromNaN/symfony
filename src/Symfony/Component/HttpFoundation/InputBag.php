@@ -92,4 +92,23 @@ final class InputBag extends ParameterBag
 
         return filter_var($value, $filter, $options);
     }
+
+    /**
+     * @throws BadRequestException of invalid data
+     */
+    public function getInteger(string $key, int $default = 0): int
+    {
+        $value = $this->filter($key, $default, \FILTER_VALIDATE_INT);
+
+        if (false === $value) {
+            throw new BadRequestException(sprintf('Input value "%s" is not a valid "int".', $key));
+        }
+
+        return $value;
+    }
+
+    public function getString(string $key, string $default = ''): string
+    {
+        return (string) $this->get($key, $default);
+    }
 }

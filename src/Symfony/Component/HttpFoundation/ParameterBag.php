@@ -141,9 +141,13 @@ class ParameterBag implements \IteratorAggregate, \Countable
      */
     public function getInteger(string $key, int $default = 0): int
     {
-        $value = $this->filter($key, $default, \FILTER_VALIDATE_INT, ['flags' => \FILTER_REQUIRE_SCALAR]);
+        $value = $this->filter($key, $default, \FILTER_VALIDATE_INT);
 
-        return false === $value ? $default : $value;
+        if (false === $value) {
+            throw new \TypeError('The value must be an int.');
+        }
+
+        return $value;
     }
 
     /**
@@ -157,7 +161,8 @@ class ParameterBag implements \IteratorAggregate, \Countable
             return (string) $value;
         }
 
-        return $default;
+        // Let the TypeError if invalid data
+        return $value;
     }
 
     /**
