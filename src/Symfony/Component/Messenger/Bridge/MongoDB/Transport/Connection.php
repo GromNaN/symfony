@@ -29,6 +29,9 @@ use Symfony\Component\Messenger\Exception\TransportException;
 class Connection
 {
     private const DEFAULT_OPTIONS = [
+        'priority_support' => false, // @todo check if similar option exist on other bridges
+
+        // Redis options
         'host' => '127.0.0.1',
         'port' => 6379,
         'stream' => 'messages',
@@ -305,6 +308,10 @@ class Connection
         if ($this->autoSetup) {
             $this->setup();
         }
+
+
+        $this->getMongoDB()->
+
         $now = microtime();
         $now = substr($now, 11).substr($now, 2, 3);
 

@@ -11,10 +11,11 @@
 
 namespace Symfony\Component\Messenger\Bridge\MongoDB\Tests\Transport;
 
+use MongoDB\Driver\Manager;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Bridge\MongoDB\Transport\Connection;
 use Symfony\Component\Messenger\Bridge\MongoDB\Transport\MongoDBTransport;
-use Symfony\Component\Messenger\Bridge\MongoDB\Transport\RedisTransportFactory;
+use Symfony\Component\Messenger\Bridge\MongoDB\Transport\MongoDBTransportFactory;
 use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 
 /**
@@ -22,13 +23,13 @@ use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
  */
 class MongoDBTransportFactoryTest extends TestCase
 {
-    public function testSupportsOnlyRedisTransports()
+    public function testSupportsOnlyMongoDBTransports()
     {
-        $factory = new RedisTransportFactory();
+        $factory = new MongoDBTransportFactory();
 
-        $this->assertTrue($factory->supports('redis://localhost', []));
-        $this->assertTrue($factory->supports('rediss://localhost', []));
-        $this->assertFalse($factory->supports('sqs://localhost', []));
+        $this->assertTrue($factory->supports('mongodb://localhost', []));
+        $this->assertTrue($factory->supports('mongodb://mongodb0.example.com:27017/db0', []));
+        $this->assertFalse($factory->supports('redis://localhost', []));
         $this->assertFalse($factory->supports('invalid-dsn', []));
     }
 
@@ -39,17 +40,17 @@ class MongoDBTransportFactoryTest extends TestCase
     {
         $this->skipIfRedisUnavailable();
 
-        $factory = new RedisTransportFactory();
+        $factory = new MongoDBTransportFactory();
         $serializer = $this->createMock(SerializerInterface::class);
-        $expectedTransport = new MongoDBTransport(Connection::fromDsn('redis://'.getenv('REDIS_HOST'), ['stream' => 'bar', 'delete_after_ack' => true]), $serializer);
+        $expectedTransport = new MongoDBTransport(Connection::fromDsn(getenv('MONGODB_URI'), ['collection' => 'bar']), $serializer);
 
-        $this->assertEquals($expectedTransport, $factory->createTransport('redis://'.getenv('REDIS_HOST'), ['stream' => 'bar', 'delete_after_ack' => true], $serializer));
+        $this->assertEquals($expectedTransport, $factory->createTransport(getenv('MONGODB_URI'), ['collection' => 'bar'], $serializer));
     }
 
     private function skipIfRedisUnavailable()
     {
         try {
-            (new \Redis())->connect(...explode(':', getenv('REDIS_HOST')));
+            (new Manager(getenv('MONGODB_URI')))->startSession();
         } catch (\Exception $e) {
             self::markTestSkipped($e->getMessage());
         }

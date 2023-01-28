@@ -18,7 +18,7 @@ use Symfony\Component\Messenger\Transport\TransportInterface;
 /**
  * @author Jérôme Tamarelle <jerome@tamarelle.net>
  */
-class RedisTransportFactory implements TransportFactoryInterface
+class MongoDBTransportFactory implements TransportFactoryInterface
 {
     public function createTransport(#[\SensitiveParameter] string $dsn, array $options, SerializerInterface $serializer): TransportInterface
     {
@@ -29,6 +29,6 @@ class RedisTransportFactory implements TransportFactoryInterface
 
     public function supports(#[\SensitiveParameter] string $dsn, array $options): bool
     {
-        return str_starts_with($dsn, 'redis://') || str_starts_with($dsn, 'rediss://');
+        return str_starts_with($dsn, 'mongodb://');
     }
 }
