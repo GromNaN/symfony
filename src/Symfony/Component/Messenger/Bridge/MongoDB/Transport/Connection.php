@@ -11,620 +11,465 @@
 
 namespace Symfony\Component\Messenger\Bridge\MongoDB\Transport;
 
-use MongoDB\Collection;
+use Doctrine\DBAL\Connection as DBALConnection;
+use Doctrine\DBAL\Driver\Exception as DriverException;
+use Doctrine\DBAL\Driver\Result as DriverResult;
+use MongoDB\Exception\Exception as MongoDBException;
+use Doctrine\DBAL\Exception\TableNotFoundException;
+use Doctrine\DBAL\LockMode;
+use Doctrine\DBAL\Platforms\MySQLPlatform;
+use Doctrine\DBAL\Platforms\OraclePlatform;
+use Doctrine\DBAL\Query\QueryBuilder;
+use Doctrine\DBAL\Result;
+use Doctrine\DBAL\Schema\AbstractSchemaManager;
+use Doctrine\DBAL\Schema\Comparator;
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\DBAL\Schema\SchemaDiff;
+use Doctrine\DBAL\Schema\Synchronizer\SchemaSynchronizer;
+use Doctrine\DBAL\Schema\Table;
+use Doctrine\DBAL\Types\Types;
+use MongoDB\Client;
+use MongoDB\Driver\Command;
 use MongoDB\Driver\Manager;
 use Symfony\Component\Messenger\Exception\InvalidArgumentException;
-use Symfony\Component\Messenger\Exception\LogicException;
 use Symfony\Component\Messenger\Exception\TransportException;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
- * A MongoDB connection.
- *
- * @author Jérôme Tamarelle <jerome@tamarelle.net>
- *
  * @internal
  *
- * @final
+ * @author Vincent Touzet <vincent.touzet@gmail.com>
+ * @author Kévin Dunglas <dunglas@gmail.com>
  */
-class Connection
+class Connection implements ResetInterface
 {
-    private const DEFAULT_OPTIONS = [
-        'priority_support' => false, // @todo check if similar option exist on other bridges
+    protected const TABLE_OPTION_NAME = '_symfony_messenger_collection_name';
 
-        // Redis options
-        'host' => '127.0.0.1',
-        'port' => 6379,
-        'stream' => 'messages',
-        'group' => 'symfony',
-        'consumer' => 'consumer',
+    protected const DEFAULT_OPTIONS = [
+        'collection_name' => 'messenger_messages',
+        'queue_name' => 'default',
+        'redeliver_timeout' => 3600,
         'auto_setup' => true,
-        'delete_after_ack' => true,
-        'delete_after_reject' => true,
-        'stream_max_entries' => 0, // any value higher than 0 defines an approximate maximum number of stream entries
-        'dbindex' => 0,
-        'redeliver_timeout' => 3600, // Timeout before redeliver messages still in pending state (seconds)
-        'claim_interval' => 60000, // Interval by which pending/abandoned messages should be checked
-        'lazy' => false,
-        'auth' => null,
-        'serializer' => 1, // see \Redis::SERIALIZER_PHP,
-        'sentinel_master' => null, // String, master to look for (optional, default is NULL meaning Sentinel support is disabled)
-        'timeout' => 0.0, // Float, value in seconds (optional, default is 0 meaning unlimited)
-        'read_timeout' => 0.0, //  Float, value in seconds (optional, default is 0 meaning unlimited)
-        'retry_interval' => 0, //  Int, value in milliseconds (optional, default is 0)
-        'persistent_id' => null, // String, persistent connection id (optional, default is NULL meaning not persistent)
-        'ssl' => null, // see https://php.net/context.ssl
     ];
 
-    private Manager|\Closure $mongodb;
-    private string $stream;
-    private string $queue;
-    private string $group;
-    private string $consumer;
+    /**
+     * Configuration of the connection.
+     *
+     * Available options:
+     *
+     * * collection_name: name of the table
+     * * connection: name of the Doctrine's entity manager
+     * * queue_name: name of the queue
+     * * redeliver_timeout: Timeout before redeliver messages still in handling state (i.e: delivered_at is not null and message is still in table). Default: 3600
+     * * auto_setup: Whether the table should be created automatically during send / get. Default: true
+     */
+    protected $configuration = [];
+    protected $driverConnection;
+    protected $queueEmptiedAt;
     private bool $autoSetup;
-    private int $maxEntries;
-    private int $redeliverTimeout;
-    private float $nextClaim = 0.0;
-    private float $claimInterval;
-    private bool $deleteAfterAck;
-    private bool $deleteAfterReject;
-    private bool $couldHavePendingMessages = true;
 
-    public function __construct(array $options, Manager $mongodb = null)
+    private Client $mongodb;
+
+    public function __construct(array $configuration, Client $mongodb = null)
     {
-        /*
-        if (version_compare(phpversion('mongodb'), '4.3.0', '<')) {
-            throw new LogicException('The redis transport requires php-redis 4.3.0 or higher.');
-        }
-        */
+        $this->configuration = array_replace_recursive(static::DEFAULT_OPTIONS, $configuration);
+        $this->mongodb = $mongodb;
+        $this->autoSetup = $this->configuration['auto_setup'];
+    }
 
-        $options += self::DEFAULT_OPTIONS;
-        $host = $options['host'];
-        $port = $options['port'];
-        $auth = $options['auth'];
-        $sentinelMaster = $options['sentinel_master'];
+    public function reset()
+    {
+        $this->queueEmptiedAt = null;
+    }
 
-        if (\is_array($host) || $redis instanceof \RedisCluster) {
-            $hosts = \is_string($host) ? [$host.':'.$port] : $host; // Always ensure we have an array
-            $this->mongodb = static fn () => self::initializeRedisCluster($redis, $hosts, $auth, $options);
-        } else {
-            if (null !== $sentinelMaster) {
-                $sentinelClass = \extension_loaded('redis') ? \RedisSentinel::class : Sentinel::class;
-                $sentinelClient = new $sentinelClass($host, $port, $options['timeout'], $options['persistent_id'], $options['retry_interval'], $options['read_timeout']);
+    public function getConfiguration(): array
+    {
+        return $this->configuration;
+    }
 
-                if (!$address = $sentinelClient->getMasterAddrByName($sentinelMaster)) {
-                    throw new InvalidArgumentException(sprintf('Failed to retrieve master information from master name "%s" and address "%s:%d".', $sentinelMaster, $host, $port));
-                }
-
-                [$host, $port] = $address;
-            }
-
-            $this->mongodb = static fn () => self::initializeRedis($redis ?? (\extension_loaded('redis') ? new \Redis() : new Relay()), $host, $port, $auth, $options);
+    public static function buildConfiguration(#[\SensitiveParameter] string $dsn, array $options = []): array
+    {
+        if (false === $components = parse_url($dsn)) {
+            throw new InvalidArgumentException('The given Doctrine Messenger DSN is invalid.');
         }
 
-        if (!$options['lazy']) {
-            $this->getMongoDB();
+        $query = [];
+        if (isset($components['query'])) {
+            parse_str($components['query'], $query);
         }
 
-        foreach (['stream', 'group', 'consumer'] as $key) {
-            if ('' === $options[$key]) {
-                throw new InvalidArgumentException(sprintf('"%s" should be configured, got an empty string.', $key));
-            }
+        $configuration = ['connection' => $components['host']];
+        $configuration += $query + $options + static::DEFAULT_OPTIONS;
+
+        $configuration['auto_setup'] = filter_var($configuration['auto_setup'], \FILTER_VALIDATE_BOOL);
+
+        // check for extra keys in options
+        $optionsExtraKeys = array_diff(array_keys($options), array_keys(static::DEFAULT_OPTIONS));
+        if (0 < \count($optionsExtraKeys)) {
+            throw new InvalidArgumentException(sprintf('Unknown option found: [%s]. Allowed options are [%s].', implode(', ', $optionsExtraKeys), implode(', ', array_keys(static::DEFAULT_OPTIONS))));
         }
 
-        $this->stream = $options['stream'];
-        $this->group = $options['group'];
-        $this->consumer = $options['consumer'];
-        $this->queue = $this->stream.'__queue';
-        $this->autoSetup = $options['auto_setup'];
-        $this->maxEntries = $options['stream_max_entries'];
-        $this->deleteAfterAck = $options['delete_after_ack'];
-        $this->deleteAfterReject = $options['delete_after_reject'];
-        $this->redeliverTimeout = $options['redeliver_timeout'] * 1000;
-        $this->claimInterval = $options['claim_interval'] / 1000;
+        // check for extra keys in options
+        $queryExtraKeys = array_diff(array_keys($query), array_keys(static::DEFAULT_OPTIONS));
+        if (0 < \count($queryExtraKeys)) {
+            throw new InvalidArgumentException(sprintf('Unknown option found in DSN: [%s]. Allowed options are [%s].', implode(', ', $queryExtraKeys), implode(', ', array_keys(static::DEFAULT_OPTIONS))));
+        }
+
+        return $configuration;
     }
 
     /**
-     * @param string|string[]|null $auth
+     * @param int $delay The delay in milliseconds
+     *
+     * @return string The inserted id
+     *
+     * @throws MongoDBException
      */
-    private static function initializeRedis(\Redis|Relay $redis, string $host, int $port, string|array|null $auth, array $params): \Redis|Relay
+    public function send(string $body, array $headers, int $delay = 0): string
     {
-        $connect = isset($params['persistent_id']) ? 'pconnect' : 'connect';
-        $redis->{$connect}($host, $port, $params['timeout'], $params['persistent_id'], $params['retry_interval'], $params['read_timeout'], ...(\defined('Redis::SCAN_PREFIX') || \extension_loaded('relay')) ? [['stream' => $params['ssl'] ?? null]] : []);
+        $now = new \DateTimeImmutable();
+        $availableAt = $now->modify(sprintf('+%d seconds', $delay / 1000));
 
-        $redis->setOption($redis instanceof \Redis ? \Redis::OPT_SERIALIZER : Relay::OPT_SERIALIZER, $params['serializer']);
+        $insert = $this->mongodb
+            ->dbname
+            ->selectCollection($this->configuration['collection_name'])
+            ->insertOne([
+                'body' => $body,
+                'headers' => $headers,
+                'queue_name' => $this->configuration['queue_name'],
+                'created_at' => $now,
+                'available_at' => $availableAt,
+            ]);
 
-        if (null !== $auth && !$redis->auth($auth)) {
-            throw new InvalidArgumentException('Redis connection failed: '.$redis->getLastError());
-        }
-
-        if (($params['dbindex'] ?? false) && !$redis->select($params['dbindex'])) {
-            throw new InvalidArgumentException('Redis connection failed: '.$redis->getLastError());
-        }
-
-        return $redis;
-    }
-
-    /**
-     * @param string|string[]|null $auth
-     */
-    private static function initializeRedisCluster(?\RedisCluster $redis, array $hosts, string|array|null $auth, array $params): \RedisCluster
-    {
-        $redis ??= new \RedisCluster(null, $hosts, $params['timeout'], $params['read_timeout'], (bool) $params['persistent'], $auth, ...\defined('Redis::SCAN_PREFIX') ? [$params['ssl'] ?? null] : []);
-        $redis->setOption(\Redis::OPT_SERIALIZER, $params['serializer']);
-
-        return $redis;
-    }
-
-    public static function fromDsn(#[\SensitiveParameter] string $dsn, array $options = [], \Redis|Relay|\RedisCluster $redis = null): self
-    {
-        if (!str_contains($dsn, ',')) {
-            $parsedUrl = self::parseDsn($dsn, $options);
-
-            if (isset($parsedUrl['host']) && 'rediss' === $parsedUrl['scheme']) {
-                $parsedUrl['host'] = 'tls://'.$parsedUrl['host'];
-            }
-        } else {
-            $dsns = explode(',', $dsn);
-            $parsedUrls = array_map(function ($dsn) use (&$options) {
-                return self::parseDsn($dsn, $options);
-            }, $dsns);
-
-            // Merge all the URLs, the last one overrides the previous ones
-            $parsedUrl = array_merge(...$parsedUrls);
-            $tls = 'rediss' === $parsedUrl['scheme'];
-
-            // Regroup all the hosts in an array interpretable by RedisCluster
-            $parsedUrl['host'] = array_map(function ($parsedUrl) use ($tls) {
-                if (!isset($parsedUrl['host'])) {
-                    throw new InvalidArgumentException('Missing host in DSN, it must be defined when using Redis Cluster.');
-                }
-                if ($tls) {
-                    $parsedUrl['host'] = 'tls://'.$parsedUrl['host'];
-                }
-
-                return $parsedUrl['host'].':'.($parsedUrl['port'] ?? 6379);
-            }, $parsedUrls, $dsns);
-        }
-
-        if ($invalidOptions = array_diff(array_keys($options), array_keys(self::DEFAULT_OPTIONS), ['host', 'port'])) {
-            throw new LogicException(sprintf('Invalid option(s) "%s" passed to the Redis Messenger transport.', implode('", "', $invalidOptions)));
-        }
-        foreach (self::DEFAULT_OPTIONS as $k => $v) {
-            $options[$k] = match (\gettype($v)) {
-                'integer' => filter_var($options[$k] ?? $v, \FILTER_VALIDATE_INT),
-                'boolean' => filter_var($options[$k] ?? $v, \FILTER_VALIDATE_BOOL),
-                'double' => filter_var($options[$k] ?? $v, \FILTER_VALIDATE_FLOAT),
-                default => $options[$k] ?? $v,
-            };
-        }
-
-        $pass = '' !== ($parsedUrl['pass'] ?? '') ? urldecode($parsedUrl['pass']) : null;
-        $user = '' !== ($parsedUrl['user'] ?? '') ? urldecode($parsedUrl['user']) : null;
-        $options['auth'] ??= null !== $pass && null !== $user ? [$user, $pass] : ($pass ?? $user);
-
-        if (isset($parsedUrl['host'])) {
-            $options['host'] = $parsedUrl['host'] ?? $options['host'];
-            $options['port'] = $parsedUrl['port'] ?? $options['port'];
-
-            $pathParts = explode('/', rtrim($parsedUrl['path'] ?? '', '/'));
-            $options['stream'] = $pathParts[1] ?? $options['stream'];
-            $options['group'] = $pathParts[2] ?? $options['group'];
-            $options['consumer'] = $pathParts[3] ?? $options['consumer'];
-        } else {
-            $options['host'] = $parsedUrl['path'];
-            $options['port'] = 0;
-        }
-
-        return new self($options, $redis);
-    }
-
-    /**
-     * @link https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-uri-format
-     */
-    private static function parseDsn(string $dsn, array &$options): array
-    {
-        $url = $dsn;
-        $scheme = str_starts_with($dsn, 'rediss:') ? 'rediss' : 'redis';
-
-        if (preg_match('#^'.$scheme.':///([^:@])+$#', $dsn)) {
-            $url = str_replace($scheme.':', 'file:', $dsn);
-        }
-        //
-        $url = preg_replace_callback('#^mongodb:(//)?(?:(?:(?<user>[^:@]*+):)?(?<password>[^@]*+)@)?#', function ($m) use (&$auth) {
-            if (isset($m['password'])) {
-                if (!\in_array($m['user'], ['', 'default'], true)) {
-                    $auth['user'] = $m['user'];
-                }
-
-                $auth['pass'] = $m['password'];
-            }
-
-            return 'file:'.($m[1] ?? '');
-        }, $url);
-
-        if (false === $parsedUrl = parse_url($url)) {
-            throw new InvalidArgumentException('The given Redis DSN is invalid.');
-        }
-
-        if (null !== $auth) {
-            unset($parsedUrl['user']); // parse_url thinks //0@localhost/ is a username of "0"! doh!
-            $parsedUrl += ($auth ?? []); // But don't worry as $auth array will have user, user/pass or pass as needed
-        }
-
-        if (isset($parsedUrl['query'])) {
-            parse_str($parsedUrl['query'], $dsnOptions);
-            $options = array_merge($options, $dsnOptions);
-        }
-        $parsedUrl['scheme'] = $scheme;
-
-        return $parsedUrl;
-    }
-
-    private function claimOldPendingMessages()
-    {
-        try {
-            // This could soon be optimized with https://github.com/antirez/redis/issues/5212 or
-            // https://github.com/antirez/redis/issues/6256
-            $pendingMessages = $this->getMongoDB()->xpending($this->stream, $this->group, '-', '+', 1);
-        } catch (\RedisException|\Relay\Exception $e) {
-            throw new TransportException($e->getMessage(), 0, $e);
-        }
-
-        $claimableIds = [];
-        foreach ($pendingMessages as $pendingMessage) {
-            if ($pendingMessage[1] === $this->consumer) {
-                $this->couldHavePendingMessages = true;
-
-                return;
-            }
-
-            if ($pendingMessage[2] >= $this->redeliverTimeout) {
-                $claimableIds[] = $pendingMessage[0];
-            }
-        }
-
-        if (\count($claimableIds) > 0) {
-            try {
-                $this->getMongoDB()->xclaim(
-                    $this->stream,
-                    $this->group,
-                    $this->consumer,
-                    $this->redeliverTimeout,
-                    $claimableIds,
-                    ['JUSTID']
-                );
-
-                $this->couldHavePendingMessages = true;
-            } catch (\RedisException|\Relay\Exception $e) {
-                throw new TransportException($e->getMessage(), 0, $e);
-            }
-        }
-
-        $this->nextClaim = microtime(true) + $this->claimInterval;
+        return (string) $insert->getInsertedId();
     }
 
     public function get(): ?array
     {
-        if ($this->autoSetup) {
-            $this->setup();
-        }
-
-
-        $this->getMongoDB()->
-
-        $now = microtime();
-        $now = substr($now, 11).substr($now, 2, 3);
-
-        $queuedMessageCount = $this->rawCommand('ZCOUNT', 0, $now);
-
-        while ($queuedMessageCount--) {
-            if (!$message = $this->rawCommand('ZPOPMIN', 1)) {
-                break;
+        if ($this->driverConnection->getDatabasePlatform() instanceof MySQLPlatform) {
+            try {
+                $this->driverConnection->delete($this->configuration['collection_name'], ['delivered_at' => '9999-12-31 23:59:59']);
+            } catch (DriverException $e) {
+                // Ignore the exception
             }
-
-            [$queuedMessage, $expiry] = $message;
-
-            if (\strlen($expiry) === \strlen($now) ? $expiry > $now : \strlen($expiry) < \strlen($now)) {
-                // if a future-placed message is popped because of a race condition with
-                // another running consumer, the message is readded to the queue
-
-                if (!$this->rawCommand('ZADD', 'NX', $expiry, $queuedMessage)) {
-                    throw new TransportException('Could not add a message to the redis stream.');
-                }
-
-                break;
-            }
-
-            $decodedQueuedMessage = json_decode($queuedMessage, true);
-            $this->add(\array_key_exists('body', $decodedQueuedMessage) ? $decodedQueuedMessage['body'] : $queuedMessage, $decodedQueuedMessage['headers'] ?? [], 0);
         }
 
-        if (!$this->couldHavePendingMessages && $this->nextClaim <= microtime(true)) {
-            $this->claimOldPendingMessages();
-        }
-
-        $messageId = '>'; // will receive new messages
-
-        if ($this->couldHavePendingMessages) {
-            $messageId = '0'; // will receive consumers pending messages
-        }
-        $redis = $this->getMongoDB();
-
+        get:
+        $this->driverConnection->beginTransaction();
         try {
-            $messages = $redis->xreadgroup(
-                $this->group,
-                $this->consumer,
-                [$this->stream => $messageId],
-                1
+            $query = $this->createAvailableMessagesQuery()
+                ->orderBy('available_at', 'ASC')
+                ->setMaxResults(1);
+
+            // Append pessimistic write lock to FROM clause if db platform supports it
+            $sql = $query->getSQL();
+            if (($fromPart = $query->getQueryPart('from')) &&
+                ($table = $fromPart[0]['table'] ?? null) &&
+                ($alias = $fromPart[0]['alias'] ?? null)
+            ) {
+                $fromClause = sprintf('%s %s', $table, $alias);
+                $sql = str_replace(
+                    sprintf('FROM %s WHERE', $fromClause),
+                    sprintf('FROM %s WHERE', $this->driverConnection->getDatabasePlatform()->appendLockHint($fromClause, LockMode::PESSIMISTIC_WRITE)),
+                    $sql
+                );
+            }
+
+            // Wrap the rownum query in a sub-query to allow writelocks without ORA-02014 error
+            if ($this->driverConnection->getDatabasePlatform() instanceof OraclePlatform) {
+                $sql = str_replace('SELECT a.* FROM', 'SELECT a.id FROM', $sql);
+
+                $wrappedQuery = $this->driverConnection->createQueryBuilder()
+                    ->select(
+                        'w.id AS "id", w.body AS "body", w.headers AS "headers", w.queue_name AS "queue_name", '.
+                        'w.created_at AS "created_at", w.available_at AS "available_at", '.
+                        'w.delivered_at AS "delivered_at"'
+                    )
+                    ->from($this->configuration['collection_name'], 'w')
+                    ->where('w.id IN('.$sql.')');
+
+                $sql = $wrappedQuery->getSQL();
+            }
+
+            // use SELECT ... FOR UPDATE to lock table
+            $stmt = $this->executeQuery(
+                $sql.' '.$this->driverConnection->getDatabasePlatform()->getWriteLockSQL(),
+                $query->getParameters(),
+                $query->getParameterTypes()
             );
-        } catch (\RedisException|\Relay\Exception $e) {
-            throw new TransportException($e->getMessage(), 0, $e);
-        }
+            $doctrineEnvelope = $stmt instanceof Result || $stmt instanceof DriverResult ? $stmt->fetchAssociative() : $stmt->fetch();
 
-        if (false === $messages) {
-            if ($error = $redis->getLastError() ?: null) {
-                $redis->clearLastError();
+            if (false === $doctrineEnvelope) {
+                $this->driverConnection->commit();
+                $this->queueEmptiedAt = microtime(true) * 1000;
+
+                return null;
+            }
+            // Postgres can "group" notifications having the same channel and payload
+            // We need to be sure to empty the queue before blocking again
+            $this->queueEmptiedAt = null;
+
+            $doctrineEnvelope = $this->decodeEnvelopeHeaders($doctrineEnvelope);
+
+            $queryBuilder = $this->driverConnection->createQueryBuilder()
+                ->update($this->configuration['collection_name'])
+                ->set('delivered_at', '?')
+                ->where('id = ?');
+            $now = new \DateTimeImmutable();
+            $this->executeStatement($queryBuilder->getSQL(), [
+                $now,
+                $doctrineEnvelope['id'],
+            ], [
+                Types::DATETIME_MUTABLE,
+            ]);
+
+            $this->driverConnection->commit();
+
+            return $doctrineEnvelope;
+        } catch (\Throwable $e) {
+            $this->driverConnection->rollBack();
+
+            if ($this->autoSetup && $e instanceof TableNotFoundException) {
+                $this->setup();
+                goto get;
             }
 
-            throw new TransportException($error ?? 'Could not read messages from the redis stream.');
-        }
-
-        if ($this->couldHavePendingMessages && empty($messages[$this->stream])) {
-            $this->couldHavePendingMessages = false;
-
-            // No pending messages so get a new one
-            return $this->get();
-        }
-
-        foreach ($messages[$this->stream] ?? [] as $key => $message) {
-            return [
-                'id' => $key,
-                'data' => $message,
-            ];
-        }
-
-        return null;
-    }
-
-    public function ack(string $id): void
-    {
-        $redis = $this->getMongoDB();
-
-        try {
-            $acknowledged = $redis->xack($this->stream, $this->group, [$id]);
-            if ($this->deleteAfterAck) {
-                $acknowledged = $redis->xdel($this->stream, [$id]);
-            }
-        } catch (\RedisException|\Relay\Exception $e) {
-            throw new TransportException($e->getMessage(), 0, $e);
-        }
-
-        if (!$acknowledged) {
-            if ($error = $redis->getLastError() ?: null) {
-                $redis->clearLastError();
-            }
-            throw new TransportException($error ?? sprintf('Could not acknowledge redis message "%s".', $id));
+            throw $e;
         }
     }
 
-    public function reject(string $id): void
+    public function ack(string $id): bool
     {
-        $redis = $this->getMongoDB();
-
         try {
-            $deleted = $redis->xack($this->stream, $this->group, [$id]);
-            if ($this->deleteAfterReject) {
-                $deleted = $redis->xdel($this->stream, [$id]) && $deleted;
-            }
-        } catch (\RedisException|\Relay\Exception $e) {
-            throw new TransportException($e->getMessage(), 0, $e);
-        }
-
-        if (!$deleted) {
-            if ($error = $redis->getLastError() ?: null) {
-                $redis->clearLastError();
-            }
-            throw new TransportException($error ?? sprintf('Could not delete message "%s" from the redis stream.', $id));
+            return $this
+                ->mongodb
+                ->dbname
+                ->selectCollection($this->configuration['collection_name'])
+                ->deleteOne(['id' => $id])
+                ->getDeletedCount() > 0;
+        } catch (MongoDBException $exception) {
+            throw new TransportException($exception->getMessage(), 0, $exception);
         }
     }
 
-    public function add(string $body, array $headers, int $delayInMs = 0): string
+    public function reject(string $id): bool
     {
-        if ($this->autoSetup) {
-            $this->setup();
-        }
-        $redis = $this->getMongoDB();
-
-        try {
-            if ($delayInMs > 0) { // the delay is <= 0 for queued messages
-                $id = uniqid('', true);
-                $message = json_encode([
-                    'body' => $body,
-                    'headers' => $headers,
-                    // Entry need to be unique in the sorted set else it would only be added once to the delayed messages queue
-                    'uniqid' => $id,
-                ]);
-
-                if (false === $message) {
-                    throw new TransportException(json_last_error_msg());
-                }
-
-                $now = explode(' ', microtime(), 2);
-                $now[0] = str_pad($delayInMs + substr($now[0], 2, 3), 3, '0', \STR_PAD_LEFT);
-                if (3 < \strlen($now[0])) {
-                    $now[1] += substr($now[0], 0, -3);
-                    $now[0] = substr($now[0], -3);
-
-                    if (\is_float($now[1])) {
-                        throw new TransportException("Message delay is too big: {$delayInMs}ms.");
-                    }
-                }
-
-                $added = $this->rawCommand('ZADD', 'NX', $now[1].$now[0], $message);
-            } else {
-                $message = json_encode([
-                    'body' => $body,
-                    'headers' => $headers,
-                ]);
-
-                if (false === $message) {
-                    throw new TransportException(json_last_error_msg());
-                }
-
-                if ($this->maxEntries) {
-                    $added = $redis->xadd($this->stream, '*', ['message' => $message], $this->maxEntries, true);
-                } else {
-                    $added = $redis->xadd($this->stream, '*', ['message' => $message]);
-                }
-
-                $id = $added;
-            }
-        } catch (\RedisException|\Relay\Exception $e) {
-            if ($error = $redis->getLastError() ?: null) {
-                $redis->clearLastError();
-            }
-            throw new TransportException($error ?? $e->getMessage(), 0, $e);
-        }
-
-        if (!$added) {
-            if ($error = $redis->getLastError() ?: null) {
-                $redis->clearLastError();
-            }
-            throw new TransportException($error ?? 'Could not add a message to the redis stream.');
-        }
-
-        return $id;
+        return $this->ack($id);
     }
 
     public function setup(): void
     {
-        $redis = $this->getMongoDB();
-
-        try {
-            $redis->xgroup('CREATE', $this->stream, $this->group, 0, true);
-        } catch (\RedisException|\Relay\Exception $e) {
-            throw new TransportException($e->getMessage(), 0, $e);
-        }
-
-        // group might already exist, ignore
-        if ($redis->getLastError()) {
-            $redis->clearLastError();
-        }
-
-        if ($this->deleteAfterAck || $this->deleteAfterReject) {
-            $groups = $redis->xinfo('GROUPS', $this->stream);
-            if (
-                // support for Redis extension version 5+
-                (\is_array($groups) && 1 < \count($groups))
-                // support for Redis extension version 4.x
-                || (\is_string($groups) && substr_count($groups, '"name"'))
-            ) {
-                throw new LogicException(sprintf('More than one group exists for stream "%s", delete_after_ack and delete_after_reject cannot be enabled as it risks deleting messages before all groups could consume them.', $this->stream));
-            }
-        }
-
+        $configuration = $this->driverConnection->getConfiguration();
+        $assetFilter = $configuration->getSchemaAssetsFilter();
+        $configuration->setSchemaAssetsFilter(null);
+        $this->updateSchema();
+        $configuration->setSchemaAssetsFilter($assetFilter);
         $this->autoSetup = false;
-    }
-
-    private function getCurrentTimeInMilliseconds(): int
-    {
-        return (int) (microtime(true) * 1000);
-    }
-
-    public function cleanup(): void
-    {
-        static $unlink = true;
-        $redis = $this->getMongoDB();
-
-        if ($unlink) {
-            try {
-                $unlink = false !== $redis->unlink($this->stream, $this->queue);
-            } catch (\Throwable) {
-                $unlink = false;
-            }
-        }
-
-        if (!$unlink) {
-            $redis->del($this->stream, $this->queue);
-        }
     }
 
     public function getMessageCount(): int
     {
-        $redis = $this->getMongoDB();
-        $groups = $redis->xinfo('GROUPS', $this->stream) ?: [];
+        $this->mongodb
+            ->dbname
+            ->selectCollection($this->configuration['collection_name'])
+            ->countDocuments()
+        $queryBuilder = $this->createAvailableMessagesQuery()
+            ->select('COUNT(m.id) as message_count')
+            ->setMaxResults(1);
 
-        $lastDeliveredId = null;
-        foreach ($groups as $group) {
-            if ($group['name'] !== $this->group) {
-                continue;
-            }
+        $stmt = $this->executeQuery($queryBuilder->getSQL(), $queryBuilder->getParameters(), $queryBuilder->getParameterTypes());
 
-            // Use "lag" key provided by Redis 7.x. See https://redis.io/commands/xinfo-groups/#consumer-group-lag.
-            if (isset($group['lag'])) {
-                return $group['lag'];
-            }
-
-            if (!isset($group['last-delivered-id'])) {
-                return 0;
-            }
-
-            $lastDeliveredId = $group['last-delivered-id'];
-            break;
-        }
-
-        if (null === $lastDeliveredId) {
-            return 0;
-        }
-
-        // Iterate through the stream. See https://redis.io/commands/xrange/#iterating-a-stream.
-        $useExclusiveRangeInterval = version_compare(phpversion('redis'), '6.2.0', '>=');
-        $total = 0;
-        while (true) {
-            if (!$range = $redis->xRange($this->stream, $lastDeliveredId, '+', 100)) {
-                return $total;
-            }
-
-            $total += \count($range);
-
-            if ($useExclusiveRangeInterval) {
-                $lastDeliveredId = preg_replace_callback('#\d+$#', static fn (array $matches) => (int) $matches[0] + 1, array_key_last($range));
-            } else {
-                $lastDeliveredId = '('.array_key_last($range);
-            }
-        }
+        return $stmt instanceof Result || $stmt instanceof DriverResult ? $stmt->fetchOne() : $stmt->fetchColumn();
     }
 
-    private function rawCommand(string $command, ...$arguments): mixed
+    public function findAll(int $limit = null): array
     {
-        $redis = $this->getMongoDB();
+        $query = $this->createAvailableMessagesQuery();
+        if (null !== $limit) {
+            $queryBuilder->setMaxResults($limit);
+        }
 
+        $data = $this->mongodb
+            ->dbname
+            ->selectCollection($this->configuration['collection_name'])
+            ->find($query, [
+                '$order' => ['']
+            ]);
+
+        return array_map(fn ($doctrineEnvelope) => $this->decodeEnvelopeHeaders($doctrineEnvelope), $data);
+    }
+
+    public function find(mixed $id): ?array
+    {
+        $data = $this->mongodb
+            ->dbname
+            ->selectCollection($this->configuration['collection_name'])
+            ->findOne([
+                'id' => $id,
+                'queue_name' => $this->configuration['queue_name']
+            ]);
+
+        return null === $data ? null : $this->decodeEnvelopeHeaders($data);
+    }
+
+    /**
+     * @internal
+     */
+    public function configureSchema(Schema $schema, DBALConnection $forConnection, \Closure $isSameDatabase): void
+    {
+        if ($schema->hasTable($this->configuration['collection_name'])) {
+            return;
+        }
+
+        if ($forConnection !== $this->driverConnection && !$isSameDatabase($this->executeStatement(...))) {
+            return;
+        }
+
+        $this->addTableToSchema($schema);
+    }
+
+    private function createAvailableMessagesQuery(): array
+    {
+        $now = new \DateTimeImmutable();
+        $redeliverLimit = $now->modify(sprintf('-%d seconds', $this->configuration['redeliver_timeout']));
+
+        return [
+            '$or' => [
+                ['delivered_at' => ['$lt' => $redeliverLimit]],
+                ['delivered_at' => null],
+            ],
+            'available_at' => ['$lte' => $now],
+            'queue_name' => $this->configuration['queue_name']
+        ];
+    }
+
+    private function executeQuery(string $sql, array $parameters = [], array $types = [])
+    {
         try {
-            if ($redis instanceof \RedisCluster) {
-                $result = $redis->rawCommand($this->queue, $command, $this->queue, ...$arguments);
-            } else {
-                $result = $redis->rawCommand($command, $this->queue, ...$arguments);
+            $stmt = $this->driverConnection->executeQuery($sql, $parameters, $types);
+        } catch (TableNotFoundException $e) {
+            if ($this->driverConnection->isTransactionActive()) {
+                throw $e;
             }
-        } catch (\RedisException|\Relay\Exception $e) {
-            throw new TransportException($e->getMessage(), 0, $e);
+
+            // create table
+            if ($this->autoSetup) {
+                $this->setup();
+            }
+            $stmt = $this->driverConnection->executeQuery($sql, $parameters, $types);
         }
 
-        if (false === $result) {
-            if ($error = $redis->getLastError() ?: null) {
-                $redis->clearLastError();
-            }
-            throw new TransportException($error ?? sprintf('Could not run "%s" on Redis queue.', $command));
-        }
-
-        return $result;
+        return $stmt;
     }
 
-    private function getMongoDB(): Manager
+    protected function executeStatement(string $sql, array $parameters = [], array $types = [])
     {
-        if ($this->mongodb instanceof \Closure) {
-            $this->mongodb = ($this->mongodb)();
+        try {
+            if (method_exists($this->driverConnection, 'executeStatement')) {
+                $stmt = $this->driverConnection->executeStatement($sql, $parameters, $types);
+            } else {
+                $stmt = $this->driverConnection->executeUpdate($sql, $parameters, $types);
+            }
+        } catch (TableNotFoundException $e) {
+            if ($this->driverConnection->isTransactionActive()) {
+                throw $e;
+            }
+
+            // create table
+            if ($this->autoSetup) {
+                $this->setup();
+            }
+            if (method_exists($this->driverConnection, 'executeStatement')) {
+                $stmt = $this->driverConnection->executeStatement($sql, $parameters, $types);
+            } else {
+                $stmt = $this->driverConnection->executeUpdate($sql, $parameters, $types);
+            }
         }
 
-        return $this->mongodb;
+        return $stmt;
+    }
+
+    private function getSchema(): Schema
+    {
+        $schema = new Schema([], [], $this->createSchemaManager()->createSchemaConfig());
+        $this->addTableToSchema($schema);
+
+        return $schema;
+    }
+
+    private function addTableToSchema(Schema $schema): void
+    {
+        $table = $schema->createTable($this->configuration['collection_name']);
+        // add an internal option to mark that we created this & the non-namespaced table name
+        $table->addOption(self::TABLE_OPTION_NAME, $this->configuration['collection_name']);
+        $table->addColumn('id', Types::BIGINT)
+            ->setAutoincrement(true)
+            ->setNotnull(true);
+        $table->addColumn('body', Types::TEXT)
+            ->setNotnull(true);
+        $table->addColumn('headers', Types::TEXT)
+            ->setNotnull(true);
+        $table->addColumn('queue_name', Types::STRING)
+            ->setLength(190) // MySQL 5.6 only supports 191 characters on an indexed column in utf8mb4 mode
+            ->setNotnull(true);
+        $table->addColumn('created_at', Types::DATETIME_MUTABLE)
+            ->setNotnull(true);
+        $table->addColumn('available_at', Types::DATETIME_MUTABLE)
+            ->setNotnull(true);
+        $table->addColumn('delivered_at', Types::DATETIME_MUTABLE)
+            ->setNotnull(false);
+        $table->setPrimaryKey(['id']);
+        $table->addIndex(['queue_name']);
+        $table->addIndex(['available_at']);
+        $table->addIndex(['delivered_at']);
+    }
+
+    private function decodeEnvelopeHeaders(array $doctrineEnvelope): array
+    {
+        $doctrineEnvelope['headers'] = json_decode($doctrineEnvelope['headers'], true);
+
+        return $doctrineEnvelope;
+    }
+
+    private function updateSchema(): void
+    {
+        if (null !== $this->schemaSynchronizer) {
+            $this->schemaSynchronizer->updateSchema($this->getSchema(), true);
+
+            return;
+        }
+
+        $schemaManager = $this->createSchemaManager();
+        $comparator = $this->createComparator($schemaManager);
+        $schemaDiff = $this->compareSchemas($comparator, $schemaManager->createSchema(), $this->getSchema());
+
+        foreach ($schemaDiff->toSaveSql($this->driverConnection->getDatabasePlatform()) as $sql) {
+            if (method_exists($this->driverConnection, 'executeStatement')) {
+                $this->driverConnection->executeStatement($sql);
+            } else {
+                $this->driverConnection->exec($sql);
+            }
+        }
+    }
+
+    private function createSchemaManager(): AbstractSchemaManager
+    {
+        return method_exists($this->driverConnection, 'createSchemaManager')
+            ? $this->driverConnection->createSchemaManager()
+            : $this->driverConnection->getSchemaManager();
+    }
+
+    private function createComparator(AbstractSchemaManager $schemaManager): Comparator
+    {
+        return method_exists($schemaManager, 'createComparator')
+            ? $schemaManager->createComparator()
+            : new Comparator();
+    }
+
+    private function compareSchemas(Comparator $comparator, Schema $from, Schema $to): SchemaDiff
+    {
+        return method_exists($comparator, 'compareSchemas')
+            ? $comparator->compareSchemas($from, $to)
+            : $comparator->compare($from, $to);
     }
 }

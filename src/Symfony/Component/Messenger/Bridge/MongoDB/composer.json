@@ -17,8 +17,8 @@
     ],
     "require": {
         "php": ">=8.1",
-        "ext-mongodb": "*",
-        "symfony/messenger": "^6.1"
+        "symfony/messenger": "^6.1",
+        "mongodb/mongodb": "v1.15.x-dev"
     },
     "require-dev": {
         "symfony/property-access": "^5.4|^6.0",
