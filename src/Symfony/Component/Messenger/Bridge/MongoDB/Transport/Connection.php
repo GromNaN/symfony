@@ -14,6 +14,7 @@ namespace Symfony\Component\Messenger\Bridge\MongoDB\Transport;
 use Doctrine\DBAL\Connection as DBALConnection;
 use Doctrine\DBAL\Driver\Exception as DriverException;
 use Doctrine\DBAL\Driver\Result as DriverResult;
+use MongoDB\Collection;
 use MongoDB\Exception\Exception as MongoDBException;
 use Doctrine\DBAL\Exception\TableNotFoundException;
 use Doctrine\DBAL\LockMode;
@@ -38,8 +39,7 @@ use Symfony\Contracts\Service\ResetInterface;
 /**
  * @internal
  *
- * @author Vincent Touzet <vincent.touzet@gmail.com>
- * @author Kévin Dunglas <dunglas@gmail.com>
+ * @author Jérôme Tamarelle <jerome@tamarelle.net>
  */
 class Connection implements ResetInterface
 {
@@ -57,7 +57,7 @@ class Connection implements ResetInterface
      *
      * Available options:
      *
-     * * collection_name: name of the table
+     * * collection_name: name of the collection
      * * connection: name of the Doctrine's entity manager
      * * queue_name: name of the queue
      * * redeliver_timeout: Timeout before redeliver messages still in handling state (i.e: delivered_at is not null and message is still in table). Default: 3600
@@ -90,7 +90,7 @@ class Connection implements ResetInterface
     public static function buildConfiguration(#[\SensitiveParameter] string $dsn, array $options = []): array
     {
         if (false === $components = parse_url($dsn)) {
-            throw new InvalidArgumentException('The given Doctrine Messenger DSN is invalid.');
+            throw new InvalidArgumentException('The given MongoDB Messenger DSN is invalid.');
         }
 
         $query = [];
@@ -130,9 +130,7 @@ class Connection implements ResetInterface
         $now = new \DateTimeImmutable();
         $availableAt = $now->modify(sprintf('+%d seconds', $delay / 1000));
 
-        $insert = $this->mongodb
-            ->dbname
-            ->selectCollection($this->configuration['collection_name'])
+        $insert = $this->getCollection()
             ->insertOne([
                 'body' => $body,
                 'headers' => $headers,
@@ -241,10 +239,7 @@ class Connection implements ResetInterface
     public function ack(string $id): bool
     {
         try {
-            return $this
-                ->mongodb
-                ->dbname
-                ->selectCollection($this->configuration['collection_name'])
+            return $this->getCollection()
                 ->deleteOne(['id' => $id])
                 ->getDeletedCount() > 0;
         } catch (MongoDBException $exception) {
@@ -269,10 +264,8 @@ class Connection implements ResetInterface
 
     public function getMessageCount(): int
     {
-        $this->mongodb
-            ->dbname
-            ->selectCollection($this->configuration['collection_name'])
-            ->countDocuments()
+        $this->getCollection()
+            ->countDocuments();
         $queryBuilder = $this->createAvailableMessagesQuery()
             ->select('COUNT(m.id) as message_count')
             ->setMaxResults(1);
@@ -289,9 +282,7 @@ class Connection implements ResetInterface
             $queryBuilder->setMaxResults($limit);
         }
 
-        $data = $this->mongodb
-            ->dbname
-            ->selectCollection($this->configuration['collection_name'])
+        $data = $this->getCollection()
             ->find($query, [
                 '$order' => ['']
             ]);
@@ -301,9 +292,7 @@ class Connection implements ResetInterface
 
     public function find(mixed $id): ?array
     {
-        $data = $this->mongodb
-            ->dbname
-            ->selectCollection($this->configuration['collection_name'])
+        $data = $this->getCollection()
             ->findOne([
                 'id' => $id,
                 'queue_name' => $this->configuration['queue_name']
@@ -471,5 +460,11 @@ class Connection implements ResetInterface
         return method_exists($comparator, 'compareSchemas')
             ? $comparator->compareSchemas($from, $to)
             : $comparator->compare($from, $to);
+    }
+
+    private function getCollection(): Collection
+    {
+        /* @fixme dbname from config */
+        return $this->mongodb->dbname->selectCollection($this->configuration['collection_name']);
     }
 }
