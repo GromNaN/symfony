@@ -149,10 +149,8 @@ abstract class Helper implements HelperInterface
         $formatter->setDecorated(false);
         // remove <...> formatting
         $string = $formatter->format($string ?? '');
-        // remove already formatted characters
-        $string = preg_replace("/\033\[[^m]*m/", '', $string ?? '');
-        // remove terminal hyperlinks
-        $string = preg_replace('/\\033]8;[^;]*;[^\\033]*\\033\\\\/', '', $string ?? '');
+        // remove already formatted characters and terminal hyperlinks
+        $string = preg_replace("/(\033\[[^m]*m|\\033]8;[^;]*;[^\\033]*\\033\\\\)/", '', $string ?? '');
         $formatter->setDecorated($isDecorated);
 
         return $string;

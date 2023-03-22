@@ -58,7 +58,9 @@ final class ProgressBar
     private bool $overwrite = true;
     private Terminal $terminal;
     private ?string $previousMessage = null;
+    private ?int $maxPreviousMessagesLineLength = null;
     private Cursor $cursor;
+    private bool $progressing = false;
     private array $placeholders = [];
 
     private static array $formatters;
@@ -414,6 +416,9 @@ final class ProgressBar
         }
 
         $this->setProgress($this->max);
+
+        $this->progressing = false;
+        $this->cursor->hide();
     }
 
     /**
@@ -450,6 +455,8 @@ final class ProgressBar
         }
 
         $this->overwrite('');
+        $this->progressing = false;
+        $this->cursor->show();
     }
 
     private function setRealFormat(string $format): void
@@ -474,30 +481,42 @@ final class ProgressBar
         }
 
         $originalMessage = $message;
+        $emptyLines = 0;
 
         if ($this->overwrite) {
-            if (null !== $this->previousMessage) {
-                if ($this->output instanceof ConsoleSectionOutput) {
-                    $messageLines = explode("\n", $this->previousMessage);
-                    $lineCount = \count($messageLines);
-                    foreach ($messageLines as $messageLine) {
-                        $messageLineLength = Helper::width(Helper::removeDecoration($this->output->getFormatter(), $messageLine));
-                        if ($messageLineLength > $this->terminal->getWidth()) {
-                            $lineCount += floor($messageLineLength / $this->terminal->getWidth());
-                        }
-                    }
-                    $this->output->clear($lineCount);
+            $newLines = explode("\n", $message);
+            $previousLines = $this->previousMessage ? explode("\n", $this->previousMessage) : [];
+            $maxNewMessagesLineLength = 0;
+            foreach ($previousLines as $i => $previousLine) {
+                /*$previousLineLength = Helper::width(Helper::removeDecoration($this->output->getFormatter(), $previousLine));
+                if (!isset($newLines[$i])) {
+                    $newLines[$i] = str_repeat(' ', $previousLineLength);
                 } else {
-                    $lineCount = substr_count($this->previousMessage, "\n");
-                    for ($i = 0; $i < $lineCount; ++$i) {
-                        $this->cursor->moveToColumn(1);
-                        $this->cursor->clearLine();
-                        $this->cursor->moveUp();
+                    $newLineLength = Helper::width(Helper::removeDecoration($this->output->getFormatter(), $newLines[$i]));
+                    if ($newLineLength < $previousLineLength) {
+                        $newLines[$i] .= str_repeat(' ', $previousLineLength - $newLineLength);
                     }
-
-                    $this->cursor->moveToColumn(1);
-                    $this->cursor->clearLine();
+                }*/
+                if (!isset($newLines[$i])) {
+                    $newLines[$i] = str_repeat(' ', $this->maxPreviousMessagesLineLength ?? 0);
+                    $emptyLines++;
+                } else {
+                    $newLineLength = Helper::width(Helper::removeDecoration($this->output->getFormatter(), $newLines[$i]));
+                    if ($newLineLength < $this->maxPreviousMessagesLineLength) {
+                        $newLines[$i] .= str_repeat(' ', $this->maxPreviousMessagesLineLength - $newLineLength);
+                    }
+                    $maxNewMessagesLineLength = max($maxNewMessagesLineLength, $newLineLength);
                 }
+            }
+
+            $this->progressing = true;
+            $this->cursor->hide();
+
+            if ($this->previousMessage) {
+                $this->maxPreviousMessagesLineLength = $maxNewMessagesLineLength;
+                $this->cursor->moveToColumn(1);
+                $this->cursor->moveUp(count($previousLines) - 1);
+                $message = implode("\n", $newLines);
             }
         } elseif ($this->step > 0) {
             $message = \PHP_EOL.$message;
@@ -508,6 +527,10 @@ final class ProgressBar
 
         $this->output->write($message);
         ++$this->writeCount;
+
+        if ($emptyLines > 0) {
+            $this->cursor->moveUp($emptyLines);
+        }
     }
 
     private function determineBestFormat(): string
@@ -608,5 +631,12 @@ final class ProgressBar
         $this->setBarWidth($this->barWidth - $linesWidth + $terminalWidth);
 
         return preg_replace_callback($regex, $callback, $this->format);
+    }
+
+    public function __destruct()
+    {
+        if ($this->overwrite && $this->progressing) {
+            $this->cursor->show();
+        }
     }
 }

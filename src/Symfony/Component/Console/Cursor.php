@@ -125,7 +125,7 @@ final class Cursor
      */
     public function show(): static
     {
-        $this->output->write("\x1b[?25h\x1b[?0c");
+        $this->output->write("\x1b[?25h");
 
         return $this;
     }
