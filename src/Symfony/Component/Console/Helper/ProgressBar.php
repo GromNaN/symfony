@@ -65,10 +65,15 @@ final class ProgressBar
     private static array $formats;
 
     /**
-     * @param int $max Maximum steps (0 if unknown)
+     * @param int|null $max Maximum steps (null if unknown)
      */
-    public function __construct(OutputInterface $output, int $max = 0, float $minSecondsBetweenRedraws = 1 / 25)
+    public function __construct(OutputInterface $output, int $max = null, float $minSecondsBetweenRedraws = 1 / 25)
     {
+        if (0 === $max) {
+            trigger_deprecation('symfony/console', '6.4', 'Passing 0 as the maximum number of steps is deprecated, pass null when maximum steps is unknown.');
+            $max = null;
+        }
+
         if ($output instanceof ConsoleOutputInterface) {
             $output = $output->getErrorOutput();
         }
@@ -193,9 +198,9 @@ final class ProgressBar
         return $this->startTime;
     }
 
-    public function getMaxSteps(): int
+    public function getMaxSteps(): ?int
     {
-        return $this->max ?? 0;
+        return $this->max;
     }
 
     public function getProgress(): int
@@ -309,13 +314,14 @@ final class ProgressBar
      * @template TValue
      *
      * @param iterable<TKey, TValue> $iterable
-     * @param int|null               $max      Number of steps to complete the bar (0 if indeterminate), if null it will be inferred from $iterable
+     * @param int|null               $max      Number of steps to complete the bar (null if unknown), if null it will be inferred from $iterable
      *
      * @return iterable<TKey, TValue>
      */
     public function iterate(iterable $iterable, int $max = null): iterable
     {
         if (0 === $max) {
+            trigger_deprecation('symfony/console', '6.4', 'Passing 0 as the maximum number of steps is deprecated, pass null when maximum steps is unknown.');
             $max = null;
         }
 
@@ -419,6 +425,7 @@ final class ProgressBar
     public function setMaxSteps(?int $max): void
     {
         if (0 === $max) {
+            trigger_deprecation('symfony/console', '6.4', 'Passing 0 as the maximum number of steps is deprecated, pass null when maximum steps is unknown.');
             $max = null;
         }
 

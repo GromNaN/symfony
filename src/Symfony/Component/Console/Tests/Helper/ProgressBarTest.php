@@ -38,7 +38,7 @@ class ProgressBarTest extends TestCase
 
     public function testMultipleStart()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->start();
         $bar->advance();
         $bar->start();
@@ -54,7 +54,7 @@ class ProgressBarTest extends TestCase
 
     public function testAdvance()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->start();
         $bar->advance();
 
@@ -68,7 +68,7 @@ class ProgressBarTest extends TestCase
 
     public function testResumeNoMax()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->start(null, 15);
         $bar->advance();
 
@@ -131,7 +131,7 @@ class ProgressBarTest extends TestCase
 
     public function testAdvanceWithStep()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->start();
         $bar->advance(5);
 
@@ -145,7 +145,7 @@ class ProgressBarTest extends TestCase
 
     public function testAdvanceMultipleTimes()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->start();
         $bar->advance(3);
         $bar->advance(2);
@@ -177,7 +177,7 @@ class ProgressBarTest extends TestCase
 
     public function testRegress()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->start();
         $bar->advance();
         $bar->advance();
@@ -195,7 +195,7 @@ class ProgressBarTest extends TestCase
 
     public function testRegressWithStep()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->start();
         $bar->advance(4);
         $bar->advance(4);
@@ -213,7 +213,7 @@ class ProgressBarTest extends TestCase
 
     public function testRegressMultipleTimes()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->start();
         $bar->advance(3);
         $bar->advance(3);
@@ -263,7 +263,7 @@ class ProgressBarTest extends TestCase
         $this->assertEquals($expected, stream_get_contents($output->getStream()));
 
         // max in start, no format
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->start(10);
         $bar->advance(10);
         $bar->finish();
@@ -282,7 +282,7 @@ class ProgressBarTest extends TestCase
         $this->assertEquals($expected, stream_get_contents($output->getStream()));
 
         // max in start, explicit format before
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->setFormat(ProgressBar::FORMAT_NORMAL);
         $bar->start(10);
         $bar->advance(10);
@@ -543,7 +543,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testStartWithMax()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->setFormat('%current%/%max% [%bar%]');
         $bar->start(50);
         $bar->advance();
@@ -577,7 +577,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testSetCurrentBeforeStarting()
     {
-        $bar = new ProgressBar($this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($this->getOutputStream(), null, 0);
         $bar->setProgress(15);
         $this->assertNotNull($bar->getStartTime());
     }
@@ -604,7 +604,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testRedrawFrequencyIsAtLeastOneIfZeroGiven()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->setRedrawFrequency(0);
         $bar->start();
         $bar->advance();
@@ -619,7 +619,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testRedrawFrequencyIsAtLeastOneIfSmallerOneGiven()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->setRedrawFrequency(0);
         $bar->start();
         $bar->advance();
@@ -634,7 +634,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testMultiByteSupport()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->start();
         $bar->setBarCharacter('■');
         $bar->advance(3);
@@ -728,7 +728,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testNonDecoratedOutputWithoutMax()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(false), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(false), null, 0);
         $bar->start();
         $bar->advance();
 
@@ -746,7 +746,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
         $bar1 = new ProgressBar($output, 2, 0);
         $bar2 = new ProgressBar($output, 3, 0);
         $bar2->setProgressCharacter('#');
-        $bar3 = new ProgressBar($output, 0, 0);
+        $bar3 = new ProgressBar($output, null, 0);
 
         $bar1->start();
         $output->write("\n");
@@ -803,7 +803,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
     {
         $output = $this->getOutputStream();
 
-        $bar = new ProgressBar($output, 0, 0);
+        $bar = new ProgressBar($output, null, 0);
         $bar->start();
         $bar->advance();
         $bar->advance();
@@ -824,7 +824,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
     public function testSettingMaxStepsDuringProgressing()
     {
         $output = $this->getOutputStream();
-        $bar = new ProgressBar($output, 0, 0);
+        $bar = new ProgressBar($output, null, 0);
         $bar->start();
         $bar->setProgress(2);
         $bar->setMaxSteps(10);
@@ -844,11 +844,18 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
         );
     }
 
+    public function testUnsettingMaxStep()
+    {
+        $bar = new ProgressBar($this->getOutputStream(), 10, 0);
+        $bar->setMaxSteps(null);
+        $this->assertNull($bar->getMaxSteps());
+    }
+
     public function testWithSmallScreen()
     {
         $output = $this->getOutputStream();
 
-        $bar = new ProgressBar($output, 0, 0);
+        $bar = new ProgressBar($output, null, 0);
         putenv('COLUMNS=12');
         $bar->start();
         $bar->advance();
@@ -986,7 +993,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testSetFormat()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->setFormat(ProgressBar::FORMAT_NORMAL);
         $bar->start();
         rewind($output->getStream());
@@ -1037,7 +1044,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
      */
     public function testFormatsWithoutMax($format)
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->setFormat($format);
         $bar->start();
 
@@ -1060,7 +1067,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testIterate()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
 
         $this->assertEquals([1, 2], iterator_to_array($bar->iterate([1, 2])));
 
@@ -1075,7 +1082,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testIterateUncountable()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
 
         $this->assertEquals([1, 2], iterator_to_array($bar->iterate((function () {
             yield 1;
@@ -1122,7 +1129,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
     {
         putenv('COLUMNS=10');
 
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->setFormat("%bar%\n0123456789");
 
         // before starting
@@ -1161,7 +1168,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testMaxSecondsBetweenRedraws()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->setRedrawFrequency(4); // disable step based redraws
         $bar->start();
 
@@ -1191,7 +1198,7 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
 
     public function testMinSecondsBetweenRedraws()
     {
-        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
         $bar->setRedrawFrequency(1);
         $bar->minSecondsBetweenRedraws(1);
         $bar->start();
@@ -1253,6 +1260,35 @@ And, as in uffish thought he stood, The Jabberwock, with eyes of flame, Came whi
             $this->generateOutput("1/3\nABC\nFoo").
             $this->generateOutput("2/3\nA\nFoo").
             $this->generateOutput("3/3\nA\nFoo"),
+            stream_get_contents($output->getStream())
+        );
+    }
+
+    public function testLegacyConstructMaxZeroForUnknown()
+    {
+        $bar = new ProgressBar($output = $this->getOutputStream(), 0, 0);
+        $bar->start();
+        $bar->advance();
+
+        rewind($output->getStream());
+        $this->assertEquals(
+            '    0 [>---------------------------]'.
+            $this->generateOutput('    1 [->--------------------------]'),
+            stream_get_contents($output->getStream())
+        );
+    }
+
+    public function testLegacySetMaxStepsZeroForUnknown()
+    {
+        $bar = new ProgressBar($output = $this->getOutputStream(), null, 0);
+        $bar->setMaxSteps(0);
+        $bar->start();
+        $bar->advance();
+
+        rewind($output->getStream());
+        $this->assertEquals(
+            '    0 [>---------------------------]'.
+            $this->generateOutput('    1 [->--------------------------]'),
             stream_get_contents($output->getStream())
         );
     }
