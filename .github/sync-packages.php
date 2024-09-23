@@ -1,0 +1,31 @@
+<?php
+
+if ('cli' !== PHP_SAPI) {
+    echo "This script can only be run from the command line.\n";
+    exit(1);
+}
+
+$mainRepo = 'https://github.com/symfony/symfony';
+exec('find src -name composer.json', $packages);
+
+foreach ($packages as $package) {
+    $package = dirname($package);
+    $c = file_get_contents($package.'/.gitattributes');
+    $c = preg_replace('{^/\.git.*+\n}m', '', $c);
+    $c .= "/.git* export-ignore\n";
+    file_put_contents($package.'/.gitattributes', $c);
+
+    @mkdir($package.'/.github');
+    file_put_contents($package.'/.github/PULL_REQUEST_TEMPLATE.md', <<<EOTXT
+        Please do not submit any Pull Requests here. They will be closed.
+        ---
+
+        Please submit your PR here instead:
+        {$mainRepo}
+
+        This repository is what we call a "subtree split": a read-only subset of that main repository.
+        We're looking forward to your PR there!
+
+        EOTXT
+    );
+}
