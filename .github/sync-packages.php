@@ -28,4 +28,30 @@ foreach ($packages as $package) {
 
         EOTXT
     );
+
+    @mkdir($package.'/.github/workflows');
+    file_put_contents($package.'/.github/workflows/close-pull-request.yml', <<<EOTXT
+        name: Close Pull Request
+
+        on:
+          pull_request_target:
+            types: [opened]
+
+        jobs:
+          run:
+            runs-on: ubuntu-latest
+            steps:
+            - uses: superbrothers/close-pull-request@v3
+              with:
+                comment: |
+                  Thanks for your Pull Request! We love contributions.
+
+                  However, you should instead open your PR on the main repository:
+                  {$mainRepo}
+
+                  This repository is what we call a "subtree split": a read-only subset of that main repository.
+                  We're looking forward to your PR there!
+
+        EOTXT
+    );
 }
