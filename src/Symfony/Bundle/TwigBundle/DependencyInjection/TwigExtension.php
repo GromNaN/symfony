@@ -11,13 +11,16 @@
 
 namespace Symfony\Bundle\TwigBundle\DependencyInjection;
 
+use Symfony\Bundle\TwigBundle\DependencyInjection\Compiler\AttributeExtensionPass;
 use Symfony\Component\AssetMapper\AssetMapper;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\Config\Resource\FileExistenceResource;
 use Symfony\Component\Console\Application;
+use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\Form\AbstractRendererEngine;
 use Symfony\Component\Form\Form;
 use Symfony\Component\HttpKernel\DependencyInjection\Extension;
@@ -25,6 +28,9 @@ use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Translation\LocaleSwitcher;
 use Symfony\Component\Translation\Translator;
 use Symfony\Contracts\Service\ResetInterface;
+use Twig\Attribute\AsTwigFilter;
+use Twig\Attribute\AsTwigFunction;
+use Twig\Attribute\AsTwigTest;
 use Twig\Environment;
 use Twig\Extension\ExtensionInterface;
 use Twig\Extension\RuntimeExtensionInterface;
@@ -178,6 +184,10 @@ class TwigExtension extends Extension
         $container->registerForAutoconfiguration(ExtensionInterface::class)->addTag('twig.extension');
         $container->registerForAutoconfiguration(LoaderInterface::class)->addTag('twig.loader');
         $container->registerForAutoconfiguration(RuntimeExtensionInterface::class)->addTag('twig.runtime');
+
+        $container->registerAttributeForAutoconfiguration(AsTwigFilter::class, AttributeExtensionPass::autoconfigureFromAttribute(...));
+        $container->registerAttributeForAutoconfiguration(AsTwigFunction::class, AttributeExtensionPass::autoconfigureFromAttribute(...));
+        $container->registerAttributeForAutoconfiguration(AsTwigTest::class, AttributeExtensionPass::autoconfigureFromAttribute(...));
 
         if (false === $config['cache']) {
             $container->removeDefinition('twig.template_cache_warmer');
