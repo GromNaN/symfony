@@ -17,6 +17,7 @@ use Symfony\Bridge\Twig\Attribute\AsTwigTest;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Exception\LogicException;
 use Twig\Environment;
 use Symfony\Bridge\Twig\Extension\AttributeExtension;
 
@@ -30,10 +31,16 @@ use Symfony\Bridge\Twig\Extension\AttributeExtension;
  */
 final class AttributeExtensionPass implements CompilerPassInterface
 {
-    private const TAG = 'twig.attribute_extension';
-
-    public static function autoconfigureFromAttribute(ChildDefinition $definition, AsTwigFilter|AsTwigFunction|AsTwigTest $attribute, \ReflectionMethod $reflector): void
+    public static function autoconfigureFromAttribute(ChildDefinition $definition, AsTwigFilter|AsTwigFunction|AsTwigTest $attribute, \ReflectionClass|\ReflectionMethod $reflector): void
     {
+        if ($reflector instanceof \ReflectionClass) {
+            try {
+                $reflector = $reflector->getMethod('__invoke');
+            } catch (\ReflectionException $e) {
+                throw new LogicException(sprintf('The class "%s" is incompatible with #[%s] attribute, __invoke method is missing', $reflector->name, get_class($attribute)), 0, $e);
+            }
+        }
+
         $parameters = $reflector->getParameters();
         $options = [
             'needs_context' => $attribute->needsContext ?? false,
@@ -65,7 +72,7 @@ final class AttributeExtensionPass implements CompilerPassInterface
             $type = 'test';
         }
 
-        $definition->addTag(self::TAG, [
+        $definition->addTag('twig.attribute_extension', [
             'type' => $type,
             'name' => $attribute->name,
             'callable' => $reflector->name,
@@ -81,7 +88,7 @@ final class AttributeExtensionPass implements CompilerPassInterface
     public function process(ContainerBuilder $container): void
     {
         $callables = [];
-        foreach ($container->findTaggedServiceIds(self::TAG, true) as $id => $tag) {
+        foreach ($container->findTaggedServiceIds('twig.attribute_extension', true) as $id => $tag) {
             $class = $container->getDefinition($id)->getClass();
             foreach($tag as $attributes) {
                 $attributes['callable'] = [$class, $attributes['callable']];

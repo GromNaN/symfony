@@ -29,7 +29,7 @@ use Twig\TwigFilter;
  *
  * @see TwigFilter
  */
-#[\Attribute(\Attribute::TARGET_METHOD | \Attribute::IS_REPEATABLE)]
+#[\Attribute(\Attribute::TARGET_METHOD | \Attribute::TARGET_CLASS | \Attribute::IS_REPEATABLE)]
 final class AsTwigFilter
 {
     /**
