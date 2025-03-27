@@ -38,6 +38,9 @@ use Symfony\Component\ObjectMapper\Tests\Fixtures\MapStruct\AToBMapper;
 use Symfony\Component\ObjectMapper\Tests\Fixtures\MapStruct\MapStructMapperMetadataFactory;
 use Symfony\Component\ObjectMapper\Tests\Fixtures\MapStruct\Source;
 use Symfony\Component\ObjectMapper\Tests\Fixtures\MapStruct\Target;
+use Symfony\Component\ObjectMapper\Tests\Fixtures\MultipleTargetProperty\A as MultipleTargetPropertyA;
+use Symfony\Component\ObjectMapper\Tests\Fixtures\MultipleTargetProperty\B as MultipleTargetPropertyB;
+use Symfony\Component\ObjectMapper\Tests\Fixtures\MultipleTargetProperty\C as MultipleTargetPropertyC;
 use Symfony\Component\ObjectMapper\Tests\Fixtures\MultipleTargets\A as MultipleTargetsA;
 use Symfony\Component\ObjectMapper\Tests\Fixtures\MultipleTargets\C as MultipleTargetsC;
 use Symfony\Component\ObjectMapper\Tests\Fixtures\Recursion\AB;
@@ -261,5 +264,20 @@ final class ObjectMapperTest extends TestCase
         $metadata->method('create')->with($u)->willReturn([new Mapping(target: ClassWithoutTarget::class, transform: fn () => new \stdClass())]);
         $mapper = new ObjectMapper($metadata);
         $mapper->map($u);
+    }
+
+    public function testMultipleTargetMapProperty()
+    {
+        $u = new MultipleTargetPropertyA();
+
+        $mapper = new ObjectMapper();
+        $b = $mapper->map($u, MultipleTargetPropertyB::class);
+        $this->assertInstanceOf(MultipleTargetPropertyB::class, $b);
+        $this->assertEquals($b->foo, 'TEST');
+        $c = $mapper->map($u, MultipleTargetPropertyC::class);
+        $this->assertInstanceOf(MultipleTargetPropertyC::class, $c);
+        $this->assertEquals($c->bar, 'test');
+        $this->assertEquals($c->foo, 'donotmap');
+        $this->assertEquals($c->doesNotExistInTargetB, 'foo');
     }
 }

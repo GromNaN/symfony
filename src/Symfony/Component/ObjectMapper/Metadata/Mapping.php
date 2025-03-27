@@ -23,7 +23,7 @@ readonly class Mapping
     /**
      * @param string|class-string|null                                                               $source    The property or the class to map from
      * @param string|class-string|null                                                               $target    The property or the class to map to
-     * @param string|bool|callable(mixed, object): bool|null                                         $if        A boolean, Symfony service name or a callable that instructs whether to map
+     * @param class-string|string|bool|callable(mixed, object): bool|null                            $if        A boolean, Symfony service name or a callable that instructs whether to map
      * @param (string|callable(mixed, object): mixed)|(string|callable(mixed, object): mixed)[]|null $transform A service id or a callable that transform the value during mapping
      */
     public function __construct(

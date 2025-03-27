@@ -117,6 +117,10 @@ final class ObjectMapper implements ObjectMapperInterface
             $propertyName = $property->getName();
             $mappings = $this->metadataFactory->create($readMetadataFrom, $propertyName);
             foreach ($mappings as $mapping) {
+                if (\is_string($mapping->if) && !$this->conditionCallableLocator?->has($mapping->if) && !is_a($mapping->if, $targetRefl->getName(), true)) {
+                    continue;
+                }
+
                 $sourcePropertyName = $propertyName;
                 if ($mapping->source && (!$refl->hasProperty($propertyName) || !isset($source->$propertyName))) {
                     $sourcePropertyName = $mapping->source;
