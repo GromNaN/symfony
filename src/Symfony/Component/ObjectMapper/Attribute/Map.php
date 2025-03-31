@@ -24,7 +24,7 @@ readonly class Map
     /**
      * @param string|class-string|null                                                               $source    The property or the class to map from
      * @param string|class-string|null                                                               $target    The property or the class to map to
-     * @param class-string|string|bool|callable(mixed, object): bool|null                            $if        A boolean, a service id or a callable that instructs whether to map
+     * @param string|bool|callable(mixed, object): bool|null                                         $if        Control whether to map to the target, or specify the target using a class name. When a string is used the service name takes precedence over the class name
      * @param (string|callable(mixed, object): mixed)|(string|callable(mixed, object): mixed)[]|null $transform A service id or a callable that transforms the value during mapping
      */
     public function __construct(
