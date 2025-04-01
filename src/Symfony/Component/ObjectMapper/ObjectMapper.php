@@ -117,17 +117,13 @@ final class ObjectMapper implements ObjectMapperInterface
             $propertyName = $property->getName();
             $mappings = $this->metadataFactory->create($readMetadataFrom, $propertyName);
             foreach ($mappings as $mapping) {
-                if (\is_string($mapping->if) && !$this->conditionCallableLocator?->has($mapping->if) && !is_a($mapping->if, $targetRefl->getName(), true)) {
-                    continue;
-                }
-
                 $sourcePropertyName = $propertyName;
                 if ($mapping->source && (!$refl->hasProperty($propertyName) || !isset($source->$propertyName))) {
                     $sourcePropertyName = $mapping->source;
                 }
 
                 $value = $this->getRawValue($source, $sourcePropertyName);
-                if (($if = $mapping->if) && ($fn = $this->getCallable($if, $this->conditionCallableLocator)) && !$this->call($fn, $value, $source)) {
+                if (($if = $mapping->if) && ($fn = $this->getCallable($if, $this->conditionCallableLocator)) && !$this->call($fn, $value, $source, $mappedTarget)) {
                     continue;
                 }
 
@@ -218,15 +214,16 @@ final class ObjectMapper implements ObjectMapperInterface
     }
 
     /**
+     * @param object $target
      * @param callable(): mixed $fn
      */
-    private function call(callable $fn, mixed $value, object $object): mixed
+    private function call(callable $fn, mixed $value, object $source, ?object $target): mixed
     {
         if (\is_string($fn)) {
             return \call_user_func($fn, $value);
         }
 
-        return $fn($value, $object);
+        return $fn($value, $source, $target);
     }
 
     /**
@@ -236,7 +233,7 @@ final class ObjectMapper implements ObjectMapperInterface
     {
         $mapTo = null;
         foreach ($metadata as $mapAttribute) {
-            if (($if = $mapAttribute->if) && ($fn = $this->getCallable($if, $this->conditionCallableLocator)) && !$this->call($fn, $value, $source)) {
+            if (($if = $mapAttribute->if) && ($fn = $this->getCallable($if, $this->conditionCallableLocator)) && !$this->call($fn, $value, $source, null)) {
                 continue;
             }
 
@@ -260,7 +257,7 @@ final class ObjectMapper implements ObjectMapperInterface
 
         foreach ($transforms as $transform) {
             if ($fn = $this->getCallable($transform, $this->transformCallableLocator)) {
-                $value = $this->call($fn, $value, $object);
+                $value = $this->call($fn, $value, $object, null);
             }
         }
 

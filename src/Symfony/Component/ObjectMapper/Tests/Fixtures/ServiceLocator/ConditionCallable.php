@@ -18,7 +18,7 @@ use Symfony\Component\ObjectMapper\ConditionCallableInterface;
  */
 class ConditionCallable implements ConditionCallableInterface
 {
-    public function __invoke(mixed $value, object $object): bool
+    public function __invoke(mixed $value, object $source, ?object $target = null): bool
     {
         return 'ok' === $value;
     }

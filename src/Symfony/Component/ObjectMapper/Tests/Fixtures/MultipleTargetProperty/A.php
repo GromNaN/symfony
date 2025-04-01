@@ -12,12 +12,13 @@
 namespace Symfony\Component\ObjectMapper\Tests\Fixtures\MultipleTargetProperty;
 
 use Symfony\Component\ObjectMapper\Attribute\Map;
+use Symfony\Component\ObjectMapper\Condition\TargetClass;
 
 #[Map(target: B::class)]
 #[Map(target: C::class)]
 class A
 {
-    #[Map(target: 'foo', transform: 'strtoupper', if: B::class)]
+    #[Map(target: 'foo', transform: 'strtoupper', if: new TargetClass(B::class))]
     #[Map(target: 'bar')]
     public string $something = 'test';
 

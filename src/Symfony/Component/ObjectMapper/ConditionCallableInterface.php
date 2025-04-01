@@ -18,13 +18,14 @@ namespace Symfony\Component\ObjectMapper;
  *
  * @experimental
  *
- * {@see Symfony\Component\ObjectMapper\Attribute\Map}
+ * {@see \Symfony\Component\ObjectMapper\Attribute\Map}
  */
 interface ConditionCallableInterface
 {
     /**
-     * @param mixed $value  The value being mapped
-     * @param T     $object The object we're working on
+     * @param mixed $value The value being mapped
+     * @param T $source The source object we're working on
+     * @param object|null $target The target object we're working on
      */
-    public function __invoke(mixed $value, object $object): bool;
+    public function __invoke(mixed $value, object $source, ?object $target = null): bool;
 }
