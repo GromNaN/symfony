@@ -1,6 +1,12 @@
 CHANGELOG
 =========
 
+7.4
+---
+
+ * Add `HttpHeaderParser` to read `Link` headers from HTTP responses
+ * Add `Link::getAttribute($name)` to retrieve the value of a link attribute
+
 4.4.0
 -----
 
