@@ -6,6 +6,7 @@ CHANGELOG
 
  * Add `HttpHeaderParser` to read `Link` headers from HTTP responses
  * Add `Link::getAttribute($name)` to retrieve the value of a link attribute
+ * Make `HttpHeaderSerializer` non-final
 
 4.4.0
 -----
