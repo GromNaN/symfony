@@ -181,11 +181,21 @@ class Link implements EvolvableLinkInterface
         return array_values($this->rel);
     }
 
+    /**
+     * Returns a list of attributes that describe the target URI.
+     *
+     * @return array<string, string|\Stringable|int|float|bool|list<string|\Stringable|int|float|bool>>
+     */
     public function getAttributes(): array
     {
         return $this->attributes;
     }
 
+    /**
+     * Return values of the given attribute that describes the target URI.
+     *
+     * @return string|\Stringable|int|float|bool|list<string|\Stringable|int|float|bool>|null
+     */
     public function getAttribute(string $attribute): string|\Stringable|int|float|bool|array|null
     {
         return $this->attributes[$attribute] ?? null;
@@ -215,6 +225,14 @@ class Link implements EvolvableLinkInterface
         return $that;
     }
 
+    /**
+     * Returns an instance with the specified attribute added.
+     *
+     * If the specified attribute is already present, it will be overwritten
+     * with the new value.
+     *
+     * @param string|\Stringable|int|float|bool|list<string|\Stringable|int|float|bool> $value
+     */
     public function withAttribute(string $attribute, string|\Stringable|int|float|bool|array $value): static
     {
         $that = clone $this;

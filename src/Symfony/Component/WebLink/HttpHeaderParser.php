@@ -11,6 +11,8 @@
 
 namespace Symfony\Component\WebLink;
 
+use Psr\Link\EvolvableLinkProviderInterface;
+
 /**
  * Parse a list of HTTP Link headers into a list of Link instances.
  *
@@ -29,12 +31,14 @@ class HttpHeaderParser
     /**
      * @param string|string[] $headers Value of the "Link" HTTP header
      */
-    public function parse(string|array $headers): GenericLinkProvider
+    public function parse(string|array $headers): EvolvableLinkProviderInterface
     {
-        $headerString = is_array($headers) ? implode(',', $headers) : $headers;
+        if (is_array($headers)) {
+            $headers = implode(', ', $headers);
+        }
         $links = new GenericLinkProvider();
 
-        if (!preg_match_all(self::LINK_PATTERN, $headerString, $matches, PREG_SET_ORDER)) {
+        if (!preg_match_all(self::LINK_PATTERN, $headers, $matches, \PREG_SET_ORDER)) {
             return $links;
         }
 
@@ -43,7 +47,7 @@ class HttpHeaderParser
             $paramsString = $match[2];
 
             $params = [];
-            if (preg_match_all(self::PARAM_PATTERN, $paramsString, $paramMatches, PREG_SET_ORDER)) {
+            if (preg_match_all(self::PARAM_PATTERN, $paramsString, $paramMatches, \PREG_SET_ORDER)) {
                 foreach ($paramMatches as $pm) {
                     $key = $pm[1];
                     $value = match (true) {
