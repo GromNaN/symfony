@@ -184,7 +184,7 @@ class Link implements EvolvableLinkInterface
     /**
      * Returns a list of attributes that describe the target URI.
      *
-     * @return array<string, string|\Stringable|int|float|bool|list<string|\Stringable|int|float|bool>>
+     * @return array<string, scalar|\Stringable|list<scalar|\Stringable>>
      */
     public function getAttributes(): array
     {
@@ -221,7 +221,7 @@ class Link implements EvolvableLinkInterface
      * If the specified attribute is already present, it will be overwritten
      * with the new value.
      *
-     * @param string|\Stringable|int|float|bool|list<string|\Stringable|int|float|bool> $value
+     * @param scalar|\Stringable|list<scalar|\Stringable> $value
      */
     public function withAttribute(string $attribute, string|\Stringable|int|float|bool|array $value): static
     {
