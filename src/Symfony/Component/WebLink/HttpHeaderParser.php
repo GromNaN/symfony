@@ -44,12 +44,12 @@ class HttpHeaderParser
 
         foreach ($matches as $match) {
             $href = $match[1];
-            $paramsString = $match[2];
+            $attributesString = $match[2];
 
-            $params = [];
-            if (preg_match_all(self::PARAM_PATTERN, $paramsString, $paramMatches, \PREG_SET_ORDER)) {
+            $attributes = [];
+            if (preg_match_all(self::PARAM_PATTERN, $attributesString, $attributeMatches, \PREG_SET_ORDER)) {
                 $rels = null;
-                foreach ($paramMatches as $pm) {
+                foreach ($attributeMatches as $pm) {
                     $key = $pm[1];
                     $value = match (true) {
                         // Quoted value, unescape quotes
@@ -61,12 +61,12 @@ class HttpHeaderParser
                     if ($key === 'rel') {
                         // Only the first occurrence of the "rel" attribute is read
                         $rels ??= $value === true ? [] : preg_split('/\s+/', $value, 0,\PREG_SPLIT_NO_EMPTY);
-                    } elseif (is_array($params[$key] ?? null)) {
-                        $params[$key][] = $value;
-                    } elseif (isset($params[$key])) {
-                        $params[$key] = [$params[$key], $value];
+                    } elseif (is_array($attributes[$key] ?? null)) {
+                        $attributes[$key][] = $value;
+                    } elseif (isset($attributes[$key])) {
+                        $attributes[$key] = [$attributes[$key], $value];
                     } else {
-                        $params[$key] = $value;
+                        $attributes[$key] = $value;
                     }
                 }
             }
@@ -75,7 +75,7 @@ class HttpHeaderParser
             foreach ($rels ?? [] as $rel) {
                 $link = $link->withRel($rel);
             }
-            foreach ($params as $k => $v) {
+            foreach ($attributes as $k => $v) {
                 $link = $link->withAttribute($k, $v);
             }
             $links = $links->withLink($link);
