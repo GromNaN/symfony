@@ -31,7 +31,6 @@ class LinkTest extends TestCase
         $this->assertContains('next', $link->getRels());
         $this->assertArrayHasKey('me', $link->getAttributes());
         $this->assertSame('you', $link->getAttributes()['me']);
-        $this->assertSame('you', $link->getAttribute('me'));
     }
 
     public function testCanRemoveValues()
@@ -48,7 +47,6 @@ class LinkTest extends TestCase
         $this->assertSame('http://www.google.com', $link->getHref());
         $this->assertFalse(\in_array('next', $link->getRels(), true));
         $this->assertArrayNotHasKey('me', $link->getAttributes());
-        $this->assertNull($link->getAttribute('me'));
     }
 
     public function testMultipleRels()

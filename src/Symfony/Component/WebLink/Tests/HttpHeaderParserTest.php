@@ -32,26 +32,23 @@ class HttpHeaderParserTest extends TestCase
 
         self::assertSame(['prerender'], $links[0]->getRels());
         self::assertSame('/1', $links[0]->getHref());
-        self::assertSame(null, $links[0]->getAttribute('rel'));
+        self::assertSame([], $links[0]->getAttributes());
 
         self::assertSame(['dns-prefetch'], $links[1]->getRels());
         self::assertSame('/2', $links[1]->getHref());
-        self::assertSame('0.7', $links[1]->getAttribute('pr'));
+        self::assertSame(['pr' => '0.7'], $links[1]->getAttributes());
 
         self::assertSame(['preload'], $links[2]->getRels());
         self::assertSame('/3', $links[2]->getHref());
-        self::assertSame('script', $links[2]->getAttribute('as'));
-        self::assertSame(null, $links[2]->getAttribute('nopush'));
+        self::assertSame(['as' => 'script'], $links[2]->getAttributes());
 
         self::assertSame(['preload'], $links[3]->getRels());
         self::assertSame('/4', $links[3]->getHref());
-        self::assertSame('image', $links[3]->getAttribute('as'));
-        self::assertSame(true, $links[3]->getAttribute('nopush'));
+        self::assertSame(['as' => 'image', 'nopush' => true], $links[3]->getAttributes());
 
         self::assertSame(['alternate', 'next'], $links[4]->getRels());
         self::assertSame('/5', $links[4]->getHref());
-        self::assertSame(['fr', 'de'], $links[4]->getAttribute('hreflang'));
-        self::assertSame('Hello', $links[4]->getAttribute('title'));
+        self::assertSame(['hreflang' => ['fr', 'de'], 'title' => 'Hello'], $links[4]->getAttributes());
     }
 
     public function testParseEmpty()

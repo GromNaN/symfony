@@ -191,16 +191,6 @@ class Link implements EvolvableLinkInterface
         return $this->attributes;
     }
 
-    /**
-     * Return values of the given attribute that describes the target URI.
-     *
-     * @return string|\Stringable|int|float|bool|list<string|\Stringable|int|float|bool>|null
-     */
-    public function getAttribute(string $attribute): string|\Stringable|int|float|bool|array|null
-    {
-        return $this->attributes[$attribute] ?? null;
-    }
-
     public function withHref(string|\Stringable $href): static
     {
         $that = clone $this;
