@@ -48,6 +48,7 @@ class HttpHeaderParser
 
             $params = [];
             if (preg_match_all(self::PARAM_PATTERN, $paramsString, $paramMatches, \PREG_SET_ORDER)) {
+                $rels = null;
                 foreach ($paramMatches as $pm) {
                     $key = $pm[1];
                     $value = match (true) {
@@ -57,7 +58,10 @@ class HttpHeaderParser
                         default => true,
                     };
 
-                    if (is_array($params[$key] ?? null)) {
+                    if ($key === 'rel') {
+                        // Only the first occurrence of the "rel" attribute is read
+                        $rels ??= $value === true ? [] : preg_split('/\s+/', $value, 0,\PREG_SPLIT_NO_EMPTY);
+                    } elseif (is_array($params[$key] ?? null)) {
                         $params[$key][] = $value;
                     } elseif (isset($params[$key])) {
                         $params[$key] = [$params[$key], $value];
@@ -67,15 +71,9 @@ class HttpHeaderParser
                 }
             }
 
-            if (!isset($params['rel'])) {
-                continue;
-            }
-            $rels = preg_split('/\s+/', trim($params['rel']));
-            unset($params['rel']);
-
             $link = new Link(null, $href);
-            foreach ($rels as $r) {
-                $link = $link->withRel($r);
+            foreach ($rels ?? [] as $rel) {
+                $link = $link->withRel($rel);
             }
             foreach ($params as $k => $v) {
                 $link = $link->withAttribute($k, $v);

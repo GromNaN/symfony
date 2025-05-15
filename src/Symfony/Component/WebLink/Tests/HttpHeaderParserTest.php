@@ -60,14 +60,14 @@ class HttpHeaderParserTest extends TestCase
 
     /** @dataProvider provideHeaderParsingCases */
     #[DataProvider('provideHeaderParsingCases')]
-    public function testParseVariousAttributes(string $header, array $expectedAttributes)
+    public function testParseVariousAttributes(string $header, array $expectedRels, array $expectedAttributes)
     {
         $parser = new HttpHeaderParser();
         $links = $parser->parse($header)->getLinks();
 
         self::assertCount(1, $links);
-        self::assertSame(['alternate'], $links[0]->getRels());
         self::assertSame('/foo', $links[0]->getHref());
+        self::assertSame($expectedRels, $links[0]->getRels());
         self::assertSame($expectedAttributes, $links[0]->getAttributes());
     }
 
@@ -75,17 +75,38 @@ class HttpHeaderParserTest extends TestCase
     {
         yield 'double_quotes_in_attribute_value' => [
             '</foo>; rel="alternate"; title="\"escape me\" \"already escaped\" \"\"\""',
+            ['alternate'],
             ['title' => '"escape me" "already escaped" """'],
         ];
 
         yield 'unquoted_attribute_value' => [
             '</foo>; rel=alternate; type=text/html',
+            ['alternate'],
             ['type' => 'text/html'],
         ];
 
         yield 'attribute_with_punctuation' => [
             '</foo>; rel="alternate"; title=">; hello, world; test:case"',
+            ['alternate'],
             ['title' => '>; hello, world; test:case'],
+        ];
+
+        yield 'no_rel' => [
+            '</foo>; type=text/html',
+            [],
+            ['type' => 'text/html'],
+        ];
+
+        yield 'empty_rel' => [
+            '</foo>; rel',
+            [],
+            [],
+        ];
+
+        yield 'multiple_rel_attributes_get_first' => [
+            '</foo>; rel="alternate" rel="next"',
+            ['alternate'],
+            [],
         ];
     }
 }
