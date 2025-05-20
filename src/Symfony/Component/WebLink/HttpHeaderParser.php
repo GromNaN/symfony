@@ -55,12 +55,13 @@ class HttpHeaderParser
                         // Quoted value, unescape quotes
                         ($pm[2] ?? '') !== '' => stripcslashes($pm[2]),
                         ($pm[3] ?? '') !== '' => $pm[3],
+                        // No value
                         default => true,
                     };
 
                     if ($key === 'rel') {
                         // Only the first occurrence of the "rel" attribute is read
-                        $rels ??= $value === true ? [] : preg_split('/\s+/', $value, 0,\PREG_SPLIT_NO_EMPTY);
+                        $rels ??= $value === true ? [] : preg_split('/\s+/', $value, 0, \PREG_SPLIT_NO_EMPTY);
                     } elseif (is_array($attributes[$key] ?? null)) {
                         $attributes[$key][] = $value;
                     } elseif (isset($attributes[$key])) {
