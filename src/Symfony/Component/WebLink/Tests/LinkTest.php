@@ -49,6 +49,28 @@ class LinkTest extends TestCase
         $this->assertArrayNotHasKey('me', $link->getAttributes());
     }
 
+    public function testAttributeValues()
+    {
+        $link = new Link();
+        $link = $link
+            ->withAttribute('string', 'value')
+            ->withAttribute('int', 1)
+            ->withAttribute('float', 2.3)
+            ->withAttribute('bool', true)
+            ->withAttribute('array', ['foo', 'bar'])
+            ->withAttribute('stringable', $stringable = $this->stringable('foo'))
+        ;
+
+        self::assertSame([
+            'string' => 'value',
+            'int' => 1,
+            'float' => 2.3,
+            'bool' => true,
+            'array' => ['foo', 'bar'],
+            'stringable' => $stringable,
+        ], $link->getAttributes());
+    }
+
     public function testMultipleRels()
     {
         $link = (new Link())
@@ -72,7 +94,7 @@ class LinkTest extends TestCase
     /**
      * @dataProvider templatedHrefProvider
      */
-    public function testTemplated(string $href)
+    public function testTemplated(string|\Stringable $href)
     {
         $link = (new Link())
             ->withHref($href);
@@ -83,7 +105,7 @@ class LinkTest extends TestCase
     /**
      * @dataProvider notTemplatedHrefProvider
      */
-    public function testNotTemplated(string $href)
+    public function testNotTemplated(string|\Stringable $href)
     {
         $link = (new Link())
             ->withHref($href);
@@ -96,6 +118,7 @@ class LinkTest extends TestCase
         return [
             ['http://www.google.com/{param}/foo'],
             ['http://www.google.com/foo?q={param}'],
+            [self::stringable('http://www.google.com/{param}/foo')],
         ];
     }
 
@@ -104,6 +127,21 @@ class LinkTest extends TestCase
         return [
             ['http://www.google.com/foo'],
             ['/foo/bar/baz'],
+            [self::stringable('http://www.google.com/foo')],
         ];
+    }
+
+    private static function stringable(string $value): \Stringable
+    {
+        return new class($value) implements \Stringable {
+            public function __construct(private string $value)
+            {
+            }
+
+            public function __toString(): string
+            {
+                return $this->value;
+            }
+        };
     }
 }
