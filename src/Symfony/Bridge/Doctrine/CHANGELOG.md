@@ -6,6 +6,7 @@ CHANGELOG
 
  * Deprecate `UniqueEntity::getRequiredOptions()` and `UniqueEntity::getDefaultOption()`
  * Use a single table named `_schema_subscriber_check` in schema listeners to detect same database connections
+ * Rename `UniqueEntity` `$em` option to `$manager` as it is also used for document managers
 
 7.3
 ---

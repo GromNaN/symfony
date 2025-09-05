@@ -68,11 +68,11 @@ class UniqueEntityValidator extends ConstraintValidator
 
         $entityClass = $constraint->entityClass ?? $value::class;
 
-        if ($constraint->em) {
+        if ($constraint->manager) {
             try {
-                $em = $this->registry->getManager($constraint->em);
+                $em = $this->registry->getManager($constraint->manager);
             } catch (\InvalidArgumentException $e) {
-                throw new ConstraintDefinitionException(\sprintf('Object manager "%s" does not exist.', $constraint->em), 0, $e);
+                throw new ConstraintDefinitionException(\sprintf('Object manager "%s" does not exist.', $constraint->manager), 0, $e);
             }
         } else {
             $em = $this->registry->getManagerForClass($entityClass);

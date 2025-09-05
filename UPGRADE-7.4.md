@@ -34,6 +34,7 @@ DoctrineBridge
 --------------
 
  * Deprecate `UniqueEntity::getRequiredOptions()` and `UniqueEntity::getDefaultOption()`
+ * Rename `UniqueEntity` `$em` option to `$manager` as it is also used for document managers
 
 DomCrawler
 ----------
