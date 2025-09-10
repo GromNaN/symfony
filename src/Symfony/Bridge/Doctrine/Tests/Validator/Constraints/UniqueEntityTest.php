@@ -44,7 +44,7 @@ class UniqueEntityTest extends TestCase
         [$constraint] = $metadata->getConstraints();
         self::assertSame(['isbn'], $constraint->fields);
         self::assertSame('my_own_validator', $constraint->validatedBy());
-        self::assertSame('my_own_entity_manager', $constraint->em);
+        self::assertSame('my_own_entity_manager', $constraint->manager);
         self::assertSame('App\Entity\MyEntity', $constraint->entityClass);
         self::assertSame('fetchDifferently', $constraint->repositoryMethod);
     }

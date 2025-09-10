@@ -163,7 +163,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         yield 'Doctrine style' => [new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['name'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
         ])];
 
         yield 'Named arguments' => [new UniqueEntity(message: 'myMessage', fields: ['name'], em: 'foo')];
@@ -203,7 +203,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
 
         $this->validator->validate($entity, new UniqueEntity([
             'fields' => ['name'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
         ]));
 
         $this->assertNoViolation();
@@ -241,7 +241,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         $this->validator->validate($entity2, new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['name'],
-            'em' => 'foo',
+            'manager' => 'foo',
             'errorPath' => 'bar',
         ]));
 
@@ -952,7 +952,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         $constraint = new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['name'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
             'entityClass' => Person::class,
         ]);
 
@@ -1014,7 +1014,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         $constraint = new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['primaryName' => 'name', 'secondaryName' => 'name2'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
             'entityClass' => DoubleNameEntity::class,
         ]);
 
@@ -1059,7 +1059,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         $constraint = new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['primaryName' => 'name'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
             'entityClass' => SingleStringIdEntity::class,
         ]);
 
@@ -1091,7 +1091,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         $constraint = new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['name2'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
             'entityClass' => SingleStringIdEntity::class,
         ]);
 
@@ -1136,7 +1136,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         $constraint = new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['name'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
             'entityClass' => Person::class,
             'identifierFieldNames' => ['id'],
         ]);
@@ -1190,7 +1190,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         $constraint = new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['name'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
             'entityClass' => CompositeIntIdEntity::class,
             'identifierFieldNames' => ['id1', 'id2'],
         ]);
@@ -1243,7 +1243,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         $constraint = new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['object1' => 'objectOne', 'object2' => 'objectTwo'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
             'entityClass' => CompositeObjectNoToStringIdEntity::class,
             'identifierFieldNames' => ['object1' => 'objectOne', 'object2' => 'objectTwo'],
         ]);
@@ -1304,7 +1304,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         $constraint = new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['object1' => 'objectOne', 'object2' => 'objectTwo'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
             'entityClass' => CompositeObjectNoToStringIdEntity::class,
             'identifierFieldNames' => ['object2' => 'objectTwo'],
         ]);
@@ -1352,7 +1352,7 @@ class UniqueEntityValidatorTest extends ConstraintValidatorTestCase
         $constraint = new UniqueEntity([
             'message' => 'myMessage',
             'fields' => ['foo' => 'name'],
-            'em' => self::EM_NAME,
+            'manager' => self::EM_NAME,
             'entityClass' => DoubleNameEntity::class,
         ]);
 

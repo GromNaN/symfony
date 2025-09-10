@@ -30,7 +30,11 @@ class UniqueEntity extends Constraint
 
     public string $message = 'This value is already used.';
     public string $service = 'doctrine.orm.validator.unique';
+    /**
+     * @deprecated since Symfony 7.4, use $manager instead
+     */
     public ?string $em = null;
+    public ?string $manager = null;
     public ?string $entityClass = null;
     public string $repositoryMethod = 'findBy';
     public array|string $fields = [];
@@ -41,18 +45,19 @@ class UniqueEntity extends Constraint
     /**
      * @param array|string         $fields           The combination of fields that must contain unique values or a set of options
      * @param bool|string[]|string $ignoreNull       The combination of fields that ignore null values
-     * @param string|null          $em               The entity manager used to query for uniqueness instead of the manager of this class
+     * @param string|null          $manager          The entity manager used to query for uniqueness instead of the manager of this class
      * @param string|null          $entityClass      The entity class to enforce uniqueness on instead of the current class
      * @param string|null          $repositoryMethod The repository method to check uniqueness instead of findBy. The method will receive as its argument
      *                                               a fieldName => value associative array according to the fields option configuration
      * @param string|null          $errorPath        Bind the constraint violation to this field instead of the first one in the fields option configuration
+     * @param string|null          $em               Deprecated since Symfony 7.4, use $manager instead
      */
     #[HasNamedArguments]
     public function __construct(
         array|string $fields,
         ?string $message = null,
         ?string $service = null,
-        ?string $em = null,
+        ?string $manager = null,
         ?string $entityClass = null,
         ?string $repositoryMethod = null,
         ?string $errorPath = null,
@@ -61,6 +66,7 @@ class UniqueEntity extends Constraint
         ?array $groups = null,
         $payload = null,
         ?array $options = null,
+        ?string $em = null,
     ) {
         if (\is_array($fields) && \is_string(key($fields)) && [] === array_diff(array_keys($fields), array_merge(array_keys(get_class_vars(static::class)), ['value']))) {
             trigger_deprecation('symfony/validator', '7.3', 'Passing an array of options to configure the "%s" constraint is deprecated, use named arguments instead.', static::class);
@@ -80,10 +86,18 @@ class UniqueEntity extends Constraint
 
         parent::__construct($options, $groups, $payload);
 
+        if (null !== $em) {
+            if ($manager !== null && $em !== $manager) {
+                throw new \InvalidArgumentException(sprintf('The "em" and "manager" options of the "%s" constraint cannot be used together with distinct values.', static::class));
+            }
+            trigger_deprecation('symfony/doctrine-bridge', '7.4', 'The "em" option of the "%s" constraint is deprecated, use "manager" instead.', static::class);
+            $manager = $em;
+        }
+
         $this->fields = $fields ?? $this->fields;
         $this->message = $message ?? $this->message;
         $this->service = $service ?? $this->service;
-        $this->em = $em ?? $this->em;
+        $this->em = $this->manager = $manager ?? $this->manager ?? $this->em;
         $this->entityClass = $entityClass ?? $this->entityClass;
         $this->repositoryMethod = $repositoryMethod ?? $this->repositoryMethod;
         $this->errorPath = $errorPath ?? $this->errorPath;
