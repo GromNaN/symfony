@@ -37,6 +37,9 @@ use Symfony\Component\Security\Core\User\UserProviderInterface;
  */
 class EntityUserProvider implements UserProviderInterface, PasswordUpgraderInterface
 {
+    /**
+     * @var class-string
+     */
     private string $class;
 
     public function __construct(

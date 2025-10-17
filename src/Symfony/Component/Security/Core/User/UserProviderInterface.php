@@ -50,6 +50,8 @@ interface UserProviderInterface
 
     /**
      * Whether this provider supports the given user class.
+     *
+     * @param class-string $class
      */
     public function supportsClass(string $class): bool;
 

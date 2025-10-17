@@ -17,6 +17,9 @@ use Symfony\Component\Uid\UuidV5;
 
 class NameBasedUuidFactory
 {
+    /**
+     * @param class-string $class
+     */
     public function __construct(
         private string $class,
         private Uuid $namespace,
