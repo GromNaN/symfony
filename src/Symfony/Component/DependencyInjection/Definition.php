@@ -422,7 +422,7 @@ class Definition
      */
     public function setTags(array $tags): static
     {
-        $this->tags = $tags;
+        $this->tags = array_map('array_values', $tags);
 
         return $this;
     }
