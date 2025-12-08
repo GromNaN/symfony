@@ -267,7 +267,7 @@ class DecoratorServicePassTest extends TestCase
         $container = new ContainerBuilder();
         $container
             ->register('foo')
-            ->setTags(['proxy' => ['foo'], 'bar' => [['attr' => 'baz']]])
+            ->setTags(['proxy' => [['foo']], 'bar' => [['attr' => 'baz']]])
         ;
         $container
             ->register('baz')
@@ -277,7 +277,7 @@ class DecoratorServicePassTest extends TestCase
 
         $this->process($container);
 
-        $this->assertEquals(['proxy' => ['foo']], $container->getDefinition('baz.inner')->getTags());
+        $this->assertEquals(['proxy' => [['foo']]], $container->getDefinition('baz.inner')->getTags());
         $this->assertEquals(['bar' => [['attr' => 'baz']], 'foobar' => [['attr' => 'bar']], 'container.decorator' => [['id' => 'foo', 'inner' => 'baz.inner']]], $container->getDefinition('baz')->getTags());
     }
 

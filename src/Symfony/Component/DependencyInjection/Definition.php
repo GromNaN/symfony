@@ -397,7 +397,7 @@ class Definition
     }
 
     /**
-     * Sets whether or not instanceof conditionals should be prepended with a global set.
+     * Sets whether instanceof conditionals should be prepended with a global set.
      *
      * @return $this
      */
@@ -418,17 +418,37 @@ class Definition
     /**
      * Sets tags for this definition.
      *
+     * @param array<string, list<array>> $tags
+     *
      * @return $this
      */
     public function setTags(array $tags): static
     {
-        $this->tags = array_map('array_values', $tags);
+        foreach ($tags as $name => &$attributes) {
+            if (!\is_array($attributes)) {
+                trigger_deprecation('symfony/dependency-injection', '8.1', 'Passing a non-list of attributes for the tag "%s" is deprecated. Got "%s"', $name, get_debug_type($attributes));
+                $attributes = [$attributes];
+            }
+
+            foreach ($attributes as $i => &$attr) {
+                if (!\is_array($attr)) {
+                    trigger_deprecation('symfony/dependency-injection', '8.1', 'Passing a non-array of attributes for the tag "%s" is deprecated. Got "%s"', $name, get_debug_type($attr));
+                    $attr = [$attr];
+                }
+            }
+
+            $attributes = array_values($attributes);
+        }
+
+        $this->tags = $tags;
 
         return $this;
     }
 
     /**
      * Returns all tags.
+     *
+     * @return array<string, list<array>>
      */
     public function getTags(): array
     {
@@ -437,6 +457,8 @@ class Definition
 
     /**
      * Gets a tag by name.
+     *
+     * @return list<array>
      */
     public function getTag(string $name): array
     {
