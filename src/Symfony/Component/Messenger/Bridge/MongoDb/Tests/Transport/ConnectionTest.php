@@ -19,6 +19,7 @@ use MongoDB\Client;
 use MongoDB\Collection;
 use MongoDB\DeleteResult;
 use MongoDB\Driver\CursorInterface;
+use MongoDB\Driver\Exception\RuntimeException;
 use MongoDB\Driver\WriteConcern;
 use MongoDB\InsertOneResult;
 use MongoDB\Model\BSONDocument;
@@ -185,7 +186,7 @@ class ConnectionTest extends TestCase
     {
         $collection = $this->createStub(Collection::class);
         $collection->method('findOneAndUpdate')
-            ->willThrowException(new \Exception('Foo bar baz'));
+            ->willThrowException(new RuntimeException('Foo bar baz'));
 
         $connection = new Connection($collection, 'queueName', 100);
 
@@ -281,7 +282,7 @@ class ConnectionTest extends TestCase
     {
         $collection = $this->createStub(Collection::class);
         $collection->method('insertOne')
-            ->willThrowException(new \Exception('Foo bar baz'));
+            ->willThrowException(new RuntimeException('Foo bar baz'));
 
         $connection = new Connection($collection, 'queueName', 100);
 
@@ -325,7 +326,7 @@ class ConnectionTest extends TestCase
     {
         $collection = $this->createStub(Collection::class);
         $collection->method('deleteOne')
-            ->willThrowException(new \Exception('Foo bar baz'));
+            ->willThrowException(new RuntimeException('Foo bar baz'));
 
         $connection = new Connection($collection, 'queueName', 100);
 

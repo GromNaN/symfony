@@ -167,6 +167,20 @@ namespace MongoDB\Driver {
     }
 }
 
+namespace MongoDB\Driver\Exception {
+    if (!interface_exists(Exception::class, \extension_loaded('mongodb'))) {
+        interface Exception extends \Throwable
+        {
+        }
+    }
+
+    if (!class_exists(RuntimeException::class, \extension_loaded('mongodb'))) {
+        class RuntimeException extends \RuntimeException implements Exception
+        {
+        }
+    }
+}
+
 namespace MongoDB\Model {
     if (!class_exists(BSONDocument::class, \extension_loaded('mongodb'))) {
         #[\AllowDynamicProperties]

@@ -15,6 +15,7 @@ use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Client;
 use MongoDB\Collection;
+use MongoDB\Driver\Exception\Exception as MongoDriverException;
 use MongoDB\Driver\Session;
 use MongoDB\Driver\WriteConcern;
 use MongoDB\Model\BSONDocument;
@@ -134,7 +135,7 @@ class Connection
 
         try {
             $updatedDocument = $this->collection->findOneAndUpdate($this->createAvailableMessagesQuery(), $updateStatement, $options);
-        } catch (\Throwable $exception) {
+        } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
 
@@ -172,7 +173,7 @@ class Connection
 
         try {
             $insertResult = $this->collection->insertOne($document, $this->getWriteOptions($session));
-        } catch (\Throwable $exception) {
+        } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
 
@@ -190,7 +191,7 @@ class Connection
     {
         try {
             $deleteResult = $this->collection->deleteOne(['_id' => new ObjectId($id)], $this->getWriteOptions());
-        } catch (\Throwable $exception) {
+        } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
 
@@ -208,7 +209,7 @@ class Connection
     {
         try {
             $deleteResult = $this->collection->deleteOne(['_id' => new ObjectId($id)], $this->getWriteOptions());
-        } catch (\Throwable $exception) {
+        } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
 
@@ -222,7 +223,7 @@ class Connection
     {
         try {
             return $this->collection->countDocuments($this->createAvailableMessagesQuery());
-        } catch (\Throwable $exception) {
+        } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
     }
@@ -234,7 +235,7 @@ class Connection
     {
         try {
             $document = $this->collection->findOne(['_id' => new ObjectId($id)], $this->setTypeMapOption());
-        } catch (\Throwable $exception) {
+        } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
 
@@ -255,7 +256,7 @@ class Connection
 
         try {
             return $this->collection->find($this->createAvailableMessagesQuery(), $this->setTypeMapOption($options));
-        } catch (\Throwable $exception) {
+        } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
     }
@@ -264,7 +265,7 @@ class Connection
     {
         try {
             $this->collection->deleteMany(['queueName' => $this->queueName]);
-        } catch (\Throwable $exception) {
+        } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
     }
@@ -281,7 +282,7 @@ class Connection
                 'queueName' => 1,
                 'deliveredAt' => 1,
             ]);
-        } catch (\Throwable $exception) {
+        } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
     }
