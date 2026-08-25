@@ -13,6 +13,7 @@ namespace Symfony\Component\Messenger\Bridge\MongoDb\Tests\Transport;
 
 require_once __DIR__.'/../Stubs/mongodb.php';
 
+use MongoDB\BSON\Document;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Client;
@@ -25,6 +26,8 @@ use MongoDB\InsertOneResult;
 use MongoDB\Model\BSONDocument;
 use MongoDB\Operation\FindOneAndUpdate;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Bridge\MongoDb\Transport\Connection;
@@ -174,7 +177,7 @@ class ConnectionTest extends TestCase
                     'writeConcern' => new WriteConcern(WriteConcern::MAJORITY),
                     'returnDocument' => FindOneAndUpdate::RETURN_DOCUMENT_AFTER,
                     'sort' => ['availableAt' => 1],
-                    'typeMap' => ['root' => BSONDocument::class],
+                    'typeMap' => ['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson']],
                 ])
             )
             ->willReturn($document);
@@ -248,6 +251,57 @@ class ConnectionTest extends TestCase
         $connection = new Connection($collection, 'foobar', 3_600, $clock);
 
         $this->assertSame($objectId, $connection->send('serializedEnvelope', ['type' => 'foo']));
+    }
+
+    #[RequiresPhpExtension('mongodb')]
+    public function testSendStoresAJsonBodyAsADocument()
+    {
+        $insertOneResult = $this->createStub(InsertOneResult::class);
+        $insertOneResult->method('getInsertedId')->willReturn(new ObjectId());
+
+        $collection = $this->createMock(Collection::class);
+        $collection->expects($this->once())
+            ->method('insertOne')
+            ->with(
+                $this->callback(static function ($document): bool {
+                    self::assertEquals(Document::fromJSON('{"foo":"bar"}'), $document->body);
+
+                    return true;
+                }),
+                $this->anything()
+            )
+            ->willReturn($insertOneResult);
+
+        $connection = new Connection($collection, 'foobar', 3_600);
+        $connection->send('{"foo":"bar"}', ['Content-Type' => 'application/json']);
+    }
+
+    #[RequiresPhpExtension('mongodb')]
+    #[TestWith(['{"foo":"bar"}', []], 'JSON without the content type')]
+    #[TestWith(['{"foo":"bar"}', ['Content-Type' => 'application/xml']], 'another content type')]
+    #[TestWith(['{"foo":', ['Content-Type' => 'application/json']], 'truncated JSON')]
+    #[TestWith(['[1,2]', ['Content-Type' => 'application/json']], 'JSON that is not an object')]
+    #[TestWith(['serializedEnvelope', []], 'not JSON at all')]
+    public function testSendStoresAnyOtherBodyAsAString(string $body, array $headers)
+    {
+        $insertOneResult = $this->createStub(InsertOneResult::class);
+        $insertOneResult->method('getInsertedId')->willReturn(new ObjectId());
+
+        $collection = $this->createMock(Collection::class);
+        $collection->expects($this->once())
+            ->method('insertOne')
+            ->with(
+                $this->callback(static function ($document) use ($body): bool {
+                    self::assertSame($body, $document->body);
+
+                    return true;
+                }),
+                $this->anything()
+            )
+            ->willReturn($insertOneResult);
+
+        $connection = new Connection($collection, 'foobar', 3_600);
+        $connection->send($body, $headers);
     }
 
     public function testSendWithDelay()
@@ -375,7 +429,7 @@ class ConnectionTest extends TestCase
             ->method('findOne')
             ->with(
                 $this->equalTo(['_id' => $objectId]),
-                ['typeMap' => ['root' => BSONDocument::class]]
+                ['typeMap' => ['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson']]]
             )
             ->willReturn($document);
 
@@ -392,7 +446,7 @@ class ConnectionTest extends TestCase
             ->method('find')
             ->with($this->anything(), $this->callback(static function (array $options): bool {
                 self::assertSame(50, $options['limit']);
-                self::assertSame(['root' => BSONDocument::class], $options['typeMap']);
+                self::assertSame(['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson']], $options['typeMap']);
 
                 return true;
             }))

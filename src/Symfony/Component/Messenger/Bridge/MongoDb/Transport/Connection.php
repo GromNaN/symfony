@@ -11,6 +11,7 @@
 
 namespace Symfony\Component\Messenger\Bridge\MongoDb\Transport;
 
+use MongoDB\BSON\Document;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Client;
@@ -31,6 +32,12 @@ use Symfony\Component\Messenger\Exception\TransportException;
  */
 class Connection
 {
+    /**
+     * Content type of a JSON body, as set by the Messenger serializer. Such a
+     * body is stored as a native BSON sub-document.
+     */
+    public const CONTENT_TYPE_JSON = 'application/json';
+
     private const DEFAULT_OPTIONS = [
         'database' => null,
         'collection_name' => 'messenger_messages',
@@ -165,7 +172,8 @@ class Connection
         $availableAt = $now->modify(\sprintf('+%d milliseconds', $delay));
 
         $document = new BSONDocument();
-        $document['body'] = $body;
+
+        $document['body'] = self::parseJsonBody($body, $headers) ?? $body;
         $document['headers'] = new BSONDocument($headers);
         $document['queueName'] = $this->queueName;
         $document['createdAt'] = new UTCDateTime($now);
@@ -324,6 +332,30 @@ class Connection
     }
 
     /**
+     * A JSON body is stored as a native BSON sub-document, so the message is
+     * queryable from the database instead of being an opaque string. The
+     * "Content-Type" header, stored along with the message, tells the receiver
+     * how to read it back.
+     *
+     * Returns null when the body is not a JSON object, in which case it is
+     * stored as a string.
+     *
+     * @param array<string, string> $headers
+     */
+    private static function parseJsonBody(string $body, array $headers): ?Document
+    {
+        if (self::CONTENT_TYPE_JSON !== ($headers['Content-Type'] ?? null) || !str_starts_with(ltrim($body), '{')) {
+            return null;
+        }
+
+        try {
+            return Document::fromJSON($body);
+        } catch (MongoDriverException) {
+            return null;
+        }
+    }
+
+    /**
      * @param array<string, mixed> $readOptions
      *
      * @return array<string, mixed>
@@ -332,6 +364,9 @@ class Connection
     {
         $readOptions['typeMap'] = [
             'root' => BSONDocument::class,
+            // A body stored as a sub-document is read back as raw BSON, so the
+            // receiver can turn it into the JSON string the serializer expects.
+            'fieldPaths' => ['body' => 'bson'],
         ];
 
         return $readOptions;

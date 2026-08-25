@@ -23,6 +23,7 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
 use Symfony\Component\Messenger\Transport\Serialization\PhpSerializer;
+use Symfony\Component\Messenger\Transport\Serialization\Serializer;
 
 #[RequiresPhpExtension('mongodb')]
 #[Group('integration')]
@@ -82,6 +83,21 @@ class MongoDbTransportIntegrationTest extends TestCase
 
         $this->transport->ack($envelopes[0]);
         $this->assertSame(0, $this->transport->getMessageCount());
+    }
+
+    public function testAJsonBodyIsStoredAsAQueryableDocument()
+    {
+        $transport = new MongoDbTransport($this->connection, Serializer::create());
+        $transport->send(new Envelope(new DummyMessage('Hi')));
+
+        $collection = $this->client->getCollection(self::DATABASE, 'messenger_messages');
+
+        // the body is a native sub-document, so its fields are queryable
+        $this->assertSame(1, $collection->countDocuments(['body.message' => 'Hi']));
+
+        $envelopes = $transport->get();
+        $this->assertCount(1, $envelopes);
+        $this->assertEquals(new DummyMessage('Hi'), $envelopes[0]->getMessage());
     }
 
     public function testReject()

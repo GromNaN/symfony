@@ -13,8 +13,10 @@ namespace Symfony\Component\Messenger\Bridge\MongoDb\Tests\Transport;
 
 require_once __DIR__.'/../Stubs/mongodb.php';
 
+use MongoDB\BSON\Document;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Model\BSONDocument;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Bridge\MongoDb\Stamp\MongoDbReceivedStamp;
 use Symfony\Component\Messenger\Bridge\MongoDb\Tests\Fixtures\DummyMessage;
@@ -25,6 +27,7 @@ use Symfony\Component\Messenger\Exception\LogicException;
 use Symfony\Component\Messenger\Exception\MessageDecodingFailedException;
 use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
 use Symfony\Component\Messenger\Transport\Serialization\PhpSerializer;
+use Symfony\Component\Messenger\Transport\Serialization\Serializer;
 use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 
 class MongoDbReceiverTest extends TestCase
@@ -47,6 +50,43 @@ class MongoDbReceiverTest extends TestCase
         $this->assertSame('Hi', $message->getMessage());
         $this->assertSame((string) $document->_id, $envelope->last(MongoDbReceivedStamp::class)->getId());
         $this->assertSame((string) $document->_id, $envelope->last(TransportMessageIdStamp::class)->getId());
+    }
+
+    #[RequiresPhpExtension('mongodb')]
+    public function testItReadsABodyStoredAsADocument()
+    {
+        $serializer = Serializer::create();
+        $encodedEnvelope = $serializer->encode(new Envelope(new DummyMessage('Hi')));
+
+        $document = $this->createDocument($encodedEnvelope);
+        $document->body = Document::fromJSON($encodedEnvelope['body']);
+
+        $connection = $this->createStub(Connection::class);
+        $connection->method('get')->willReturn($document);
+
+        $receiver = new MongoDbReceiver($connection, $serializer);
+        $envelopes = $receiver->get();
+
+        $this->assertCount(1, $envelopes);
+        $this->assertEquals(new DummyMessage('Hi'), $envelopes[0]->getMessage());
+    }
+
+    #[RequiresPhpExtension('mongodb')]
+    public function testItRejectsABodyStoredAsADocumentWithoutTheJsonContentType()
+    {
+        $document = $this->createDocument(['body' => 'ignored', 'headers' => ['type' => DummyMessage::class]]);
+        $document->body = Document::fromJSON('{"message":"Hi"}');
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('get')->willReturn($document);
+        $connection->expects($this->once())->method('reject')->with((string) $document->_id);
+
+        $receiver = new MongoDbReceiver($connection, Serializer::create());
+
+        $this->expectException(MessageDecodingFailedException::class);
+        $this->expectExceptionMessage('The message body is stored as a BSON document, but its content type is "null" instead of "application/json".');
+
+        $receiver->get();
     }
 
     public function testItReturnsEmptyWhenThereAreNoMessages()

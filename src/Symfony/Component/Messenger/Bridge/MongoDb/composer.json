@@ -23,7 +23,8 @@
         "symfony/messenger": "^8.2"
     },
     "require-dev": {
-        "symfony/clock": "^7.4|^8.0"
+        "symfony/clock": "^7.4|^8.0",
+        "symfony/serializer": "^7.4|^8.0"
     },
     "autoload": {
         "psr-4": { "Symfony\\Component\\Messenger\\Bridge\\MongoDb\\": "" },

@@ -11,6 +11,7 @@
 
 namespace Symfony\Component\Messenger\Bridge\MongoDb\Transport;
 
+use MongoDB\BSON\Document;
 use MongoDB\Model\BSONDocument;
 use Symfony\Component\Messenger\Bridge\MongoDb\Stamp\MongoDbReceivedStamp;
 use Symfony\Component\Messenger\Envelope;
@@ -102,7 +103,7 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
 
         try {
             $envelope = $this->serializer->decode([
-                'body' => $document['body'] ?? null,
+                'body' => $this->decodeBody($document, $headers),
                 'headers' => $headers,
             ]);
         } catch (MessageDecodingFailedException $exception) {
@@ -115,5 +116,26 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
             new MongoDbReceivedStamp($documentId),
             new TransportMessageIdStamp($documentId)
         );
+    }
+
+    /**
+     * A body stored as a native BSON sub-document is turned back into the
+     * string the serializer produced, as told by the content type.
+     *
+     * @param array<string, string>|null $headers
+     */
+    private function decodeBody(BSONDocument $document, ?array $headers): mixed
+    {
+        $body = $document['body'] ?? null;
+
+        if (!$body instanceof Document) {
+            return $body;
+        }
+
+        if (Connection::CONTENT_TYPE_JSON !== ($headers['Content-Type'] ?? null)) {
+            throw new MessageDecodingFailedException(\sprintf('The message body is stored as a BSON document, but its content type is "%s" instead of "%s".', $headers['Content-Type'] ?? 'null', Connection::CONTENT_TYPE_JSON));
+        }
+
+        return $body->toRelaxedExtendedJSON();
     }
 }

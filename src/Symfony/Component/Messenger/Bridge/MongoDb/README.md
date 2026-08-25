@@ -19,6 +19,25 @@ keep working:
 MESSENGER_TRANSPORT_DSN=mongodb+srv://mongodb.example.com/db_name?replicaSet=repl&connectTimeoutMS=3000
 ```
 
+Message body
+------------
+
+A message body sent with the `Content-Type: application/json` header, as produced
+by the `messenger.transport.symfony_serializer` service with the `json` format, is
+stored as a native BSON sub-document instead of a string. The message fields are
+then queryable and indexable:
+
+```javascript
+db.messenger_messages.find({ 'body.orderId': 1234 })
+```
+
+Any other body, including the one produced by the default PHP serializer, is stored
+as a string.
+
+The document is read back as Relaxed Extended JSON, so a field named `$date`,
+`$oid` or `$numberInt` in the message would be interpreted as a BSON type and come
+back in another shape. Use the PHP serializer for such messages.
+
 Resources
 ---------
 
