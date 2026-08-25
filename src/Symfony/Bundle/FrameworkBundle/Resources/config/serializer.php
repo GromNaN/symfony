@@ -18,6 +18,8 @@ use Symfony\Component\ErrorHandler\ErrorRenderer\ErrorRendererInterface;
 use Symfony\Component\ErrorHandler\ErrorRenderer\HtmlErrorRenderer;
 use Symfony\Component\ErrorHandler\ErrorRenderer\SerializerErrorRenderer;
 use Symfony\Component\PropertyInfo\Extractor\SerializerExtractor;
+use Symfony\Component\Serializer\Encoder\BsonDecoder;
+use Symfony\Component\Serializer\Encoder\BsonEncoder;
 use Symfony\Component\Serializer\Encoder\CsvEncoder;
 use Symfony\Component\Serializer\Encoder\DecoderInterface;
 use Symfony\Component\Serializer\Encoder\EncoderInterface;
@@ -191,6 +193,13 @@ return static function (ContainerConfigurator $container) {
             ->tag('serializer.encoder', ['built_in' => true])
 
         ->set('serializer.encoder.csv', CsvEncoder::class)
+            ->tag('serializer.encoder', ['built_in' => true])
+
+        ->set('serializer.encoder.bson', BsonEncoder::class)
+            ->tag('serializer.encoder', ['built_in' => true])
+
+        ->set('serializer.decoder.bson', BsonDecoder::class)
+            ->args([[]])
             ->tag('serializer.encoder', ['built_in' => true])
 
         // Name converters

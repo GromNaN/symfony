@@ -4,6 +4,7 @@ CHANGELOG
 8.2
 ---
 
+ * Register the `serializer.encoder.bson` and `serializer.decoder.bson` services when the `mongodb` extension is available
  * Add the `framework.mailer.tracking` option to set default open/click tracking for every outgoing message
  * Add the `doctrine.orm.entity` tag to auto-excluded `#[Entity]` and `#[MappedSuperclass]` classes to allow discovering them
  * Add `framework.rate_limiter.builder` option
