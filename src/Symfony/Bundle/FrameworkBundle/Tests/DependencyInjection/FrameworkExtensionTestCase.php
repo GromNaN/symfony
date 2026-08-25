@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\Attributes\RequiresMethod;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\Attributes\TestWith;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LogLevel;
@@ -2015,6 +2016,14 @@ abstract class FrameworkExtensionTestCase extends TestCase
         $this->assertEquals(new Reference('serializer.mapping.attribute_loader'), $argument[0]);
         $this->assertEquals(new Reference('serializer.name_converter.camel_case_to_snake_case'), $container->getDefinition('serializer.name_converter.metadata_aware')->getArgument(1));
         $this->assertEquals(new Reference('property_info', ContainerBuilder::IGNORE_ON_INVALID_REFERENCE), $container->getDefinition('serializer.normalizer.object')->getArgument(3));
+    }
+
+    #[RequiresPhpExtension('mongodb')]
+    public function testSerializerBsonEncoderRegistered()
+    {
+        $container = $this->createContainerFromFile('full');
+        $this->assertTrue($container->hasDefinition('serializer.encoder.bson'));
+        $this->assertTrue($container->hasDefinition('serializer.decoder.bson'));
     }
 
     public function testSerializerWithoutTranslator()

@@ -17,6 +17,7 @@ use Doctrine\ORM\Mapping\Entity;
 use Doctrine\ORM\Mapping\MappedSuperclass;
 use Http\Client\HttpAsyncClient;
 use Http\Client\HttpClient;
+use MongoDB\BSON\Document as BsonDocument;
 use phpDocumentor\Reflection\DocBlockFactoryInterface;
 use phpDocumentor\Reflection\Types\ContextFactory;
 use PhpParser\Parser;
@@ -2090,6 +2091,11 @@ class FrameworkExtension extends Extension
 
         if (!class_exists(Yaml::class)) {
             $container->removeDefinition('serializer.encoder.yaml');
+        }
+
+        if (!class_exists(BsonDocument::class)) {
+            $container->removeDefinition('serializer.encoder.bson');
+            $container->removeDefinition('serializer.decoder.bson');
         }
 
         if (!$this->isInitializedConfigEnabled('property_access')) {
