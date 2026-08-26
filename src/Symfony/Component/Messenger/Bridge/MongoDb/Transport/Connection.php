@@ -13,6 +13,7 @@ namespace Symfony\Component\Messenger\Bridge\MongoDb\Transport;
 
 use MongoDB\BSON\Document;
 use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\PackedArray;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Client;
 use MongoDB\Collection;
@@ -167,8 +168,8 @@ class Connection
 
         $document = new BSONDocument();
 
-        $document['body'] = self::parseJsonBody($body) ?? $body;
-        $document['headers'] = new BSONDocument($headers);
+        $document['body'] = self::parseJson($body) ?? $body;
+        $document['headers'] = new BSONDocument(array_map(static fn (string $value): mixed => self::parseJson($value) ?? $value, $headers));
         $document['queueName'] = $this->queueName;
         $document['createdAt'] = new UTCDateTime($now);
         $document['availableAt'] = new UTCDateTime($availableAt);
@@ -326,22 +327,21 @@ class Connection
     }
 
     /**
-     * A JSON body is stored as a native BSON sub-document: the message is
-     * queryable and indexable from the database instead of being an opaque
-     * string, and numbers and dates keep their type, stored in binary form
-     * instead of text.
+     * JSON is stored as native BSON, an object as a sub-document and an array as
+     * a packed array: the message is queryable and indexable from the database
+     * instead of being an opaque string, and numbers and dates keep their type,
+     * stored in binary form instead of text.
      *
-     * Returns null when the body is not a JSON object, in which case it is
-     * stored as a string.
+     * Returns null for anything else, which is then stored as a string.
      */
-    private static function parseJsonBody(string $body): ?Document
+    private static function parseJson(string $value): Document|PackedArray|null
     {
-        if (!str_starts_with($body, '{')) {
-            return null;
-        }
-
         try {
-            return Document::fromJSON($body);
+            return match ($value[0] ?? null) {
+                '{' => Document::fromJSON($value),
+                '[' => PackedArray::fromJSON($value),
+                default => null,
+            };
         } catch (MongoDriverException) {
             return null;
         }
@@ -356,9 +356,10 @@ class Connection
     {
         $readOptions['typeMap'] = [
             'root' => BSONDocument::class,
-            // A body stored as a sub-document is read back as raw BSON, so the
-            // receiver can turn it into the JSON string the serializer expects.
-            'fieldPaths' => ['body' => 'bson'],
+            // Values stored as native BSON are read back as raw BSON, so the
+            // receiver can turn them into the JSON strings the serializer
+            // expects. A value stored as a string is left untouched.
+            'fieldPaths' => ['body' => 'bson', 'headers' => 'bson'],
         ];
 
         return $readOptions;

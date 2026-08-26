@@ -15,6 +15,7 @@ require_once __DIR__.'/../Stubs/mongodb.php';
 
 use MongoDB\BSON\Document;
 use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\PackedArray;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Client;
 use MongoDB\Collection;
@@ -177,7 +178,7 @@ class ConnectionTest extends TestCase
                     'writeConcern' => new WriteConcern(WriteConcern::MAJORITY),
                     'returnDocument' => FindOneAndUpdate::RETURN_DOCUMENT_AFTER,
                     'sort' => ['availableAt' => 1],
-                    'typeMap' => ['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson']],
+                    'typeMap' => ['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson', 'headers' => 'bson']],
                 ])
             )
             ->willReturn($document);
@@ -277,9 +278,33 @@ class ConnectionTest extends TestCase
     }
 
     #[RequiresPhpExtension('mongodb')]
+    #[RequiresPhpExtension('mongodb')]
+    public function testSendStoresAJsonHeaderAsAPackedArray()
+    {
+        $insertOneResult = $this->createStub(InsertOneResult::class);
+        $insertOneResult->method('getInsertedId')->willReturn(new ObjectId());
+
+        $collection = $this->createMock(Collection::class);
+        $collection->expects($this->once())
+            ->method('insertOne')
+            ->with(
+                $this->callback(static function ($document): bool {
+                    self::assertSame('App\Message\Foo', $document->headers['type']);
+                    self::assertEquals(PackedArray::fromJSON('[{"retryCount":0}]'), $document->headers['X-Message-Stamp-Foo']);
+
+                    return true;
+                }),
+                $this->anything()
+            )
+            ->willReturn($insertOneResult);
+
+        $connection = new Connection($collection, 'foobar', 3_600);
+        $connection->send('{"foo":"bar"}', ['type' => 'App\Message\Foo', 'X-Message-Stamp-Foo' => '[{"retryCount":0}]']);
+    }
+
     #[TestWith(['{"foo":'], 'truncated JSON')]
+    #[TestWith(['[1,2'], 'truncated JSON array')]
     #[TestWith(['{not json at all}'], 'braces without JSON')]
-    #[TestWith(['[1,2]'], 'JSON that is not an object')]
     #[TestWith(['"scalar"'], 'JSON scalar')]
     #[TestWith(['serializedEnvelope'], 'not JSON at all')]
     public function testSendStoresAnyOtherBodyAsAString(string $body)
@@ -429,7 +454,7 @@ class ConnectionTest extends TestCase
             ->method('findOne')
             ->with(
                 $this->equalTo(['_id' => $objectId]),
-                ['typeMap' => ['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson']]]
+                ['typeMap' => ['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson', 'headers' => 'bson']]]
             )
             ->willReturn($document);
 
@@ -446,7 +471,7 @@ class ConnectionTest extends TestCase
             ->method('find')
             ->with($this->anything(), $this->callback(static function (array $options): bool {
                 self::assertSame(50, $options['limit']);
-                self::assertSame(['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson']], $options['typeMap']);
+                self::assertSame(['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson', 'headers' => 'bson']], $options['typeMap']);
 
                 return true;
             }))

@@ -15,6 +15,7 @@ require_once __DIR__.'/../Stubs/mongodb.php';
 
 use MongoDB\BSON\Document;
 use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\PackedArray;
 use MongoDB\Model\BSONDocument;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
@@ -103,6 +104,35 @@ class MongoDbReceiverTest extends TestCase
             ->with($this->callback(static function (array $encodedEnvelope): bool {
                 // the millisecond timestamp was read as a BSON date
                 self::assertJsonStringEqualsJsonString('{"paidAt":{"$date":"2023-11-14T22:13:20Z"}}', $encodedEnvelope['body']);
+
+                return true;
+            }))
+            ->willReturn(new Envelope(new DummyMessage('Hi')));
+
+        $receiver = new MongoDbReceiver($connection, $serializer);
+
+        $this->assertCount(1, $receiver->get());
+    }
+
+    #[RequiresPhpExtension('mongodb')]
+    public function testItReadsHeadersStoredAsNativeBson()
+    {
+        $document = $this->createDocument(['body' => '']);
+        $document->body = Document::fromJSON('{"message":"Hi"}');
+        $document->headers = Document::fromPHP([
+            'type' => DummyMessage::class,
+            'X-Message-Stamp-Foo' => PackedArray::fromJSON('[{"retryCount":0}]'),
+        ]);
+
+        $connection = $this->createStub(Connection::class);
+        $connection->method('get')->willReturn($document);
+
+        $serializer = $this->createMock(SerializerInterface::class);
+        $serializer->expects($this->once())
+            ->method('decode')
+            ->with($this->callback(static function (array $encodedEnvelope): bool {
+                self::assertSame(DummyMessage::class, $encodedEnvelope['headers']['type']);
+                self::assertJsonStringEqualsJsonString('[{"retryCount":0}]', $encodedEnvelope['headers']['X-Message-Stamp-Foo']);
 
                 return true;
             }))

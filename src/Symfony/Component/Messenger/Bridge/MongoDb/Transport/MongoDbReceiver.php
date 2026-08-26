@@ -12,6 +12,7 @@
 namespace Symfony\Component\Messenger\Bridge\MongoDb\Transport;
 
 use MongoDB\BSON\Document;
+use MongoDB\BSON\PackedArray;
 use MongoDB\Model\BSONDocument;
 use Symfony\Component\Messenger\Bridge\MongoDb\Stamp\MongoDbReceivedStamp;
 use Symfony\Component\Messenger\Envelope;
@@ -95,16 +96,10 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
     {
         $documentId = (string) $document['_id'];
 
-        if (($document['headers'] ?? null) instanceof \stdClass) {
-            $headers = (array) $document['headers'];
-        } else {
-            $headers = null;
-        }
-
         try {
             $envelope = $this->serializer->decode([
-                'body' => self::decodeBody($document),
-                'headers' => $headers,
+                'body' => self::decodeValue($document['body'] ?? null),
+                'headers' => self::decodeHeaders($document['headers'] ?? null),
             ]);
         } catch (MessageDecodingFailedException $exception) {
             $this->connection->reject($documentId);
@@ -119,13 +114,25 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
     }
 
     /**
-     * A body stored as a native BSON sub-document holds JSON, as written by
-     * Connection::send(), so it is turned back into a JSON string.
+     * @return array<string, string>|null
      */
-    private static function decodeBody(BSONDocument $document): mixed
+    private static function decodeHeaders(mixed $headers): ?array
     {
-        $body = $document['body'] ?? null;
+        $headers = match (true) {
+            $headers instanceof Document => iterator_to_array($headers),
+            $headers instanceof \stdClass => (array) $headers,
+            default => null,
+        };
 
-        return $body instanceof Document ? $body->toRelaxedExtendedJSON() : $body;
+        return null === $headers ? null : array_map(self::decodeValue(...), $headers);
+    }
+
+    /**
+     * A value stored as native BSON holds JSON, as written by Connection::send(),
+     * so it is turned back into the JSON string the serializer produced.
+     */
+    private static function decodeValue(mixed $value): mixed
+    {
+        return $value instanceof Document || $value instanceof PackedArray ? $value->toRelaxedExtendedJSON() : $value;
     }
 }

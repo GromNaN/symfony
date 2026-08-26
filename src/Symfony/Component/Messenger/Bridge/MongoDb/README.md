@@ -35,15 +35,16 @@ framework:
                 serializer: messenger.transport.symfony_serializer
 ```
 
-A body holding a JSON object is stored as a native BSON sub-document, so the message
-fields are queryable and indexable:
+The body and each header value holding JSON are stored as native BSON: an object as
+a sub-document, an array as a packed array. The message fields and the stamps are
+then queryable and indexable:
 
 ```php
 $collection = $client->getCollection('db_name', 'messenger_messages');
 $pending = $collection->find(['body.orderId' => 1234]);
 ```
 
-Any other body, such as the output of the PHP serializer, is stored as a string.
+Anything else, such as the output of the PHP serializer, is stored as a string.
 
 The document is read back as Relaxed Extended JSON, so a nested `$date` or
 `$number*` value comes back in another shape: `{"count":{"$numberInt":"7"}}` becomes
