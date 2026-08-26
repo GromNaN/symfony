@@ -38,9 +38,16 @@ JSON object.
 A body stored as a sub-document is read back as Relaxed Extended JSON, so a message
 written straight into the collection by another producer is handled as well.
 
-Beware that a field named `$date`, `$oid` or `$numberInt` in the message is
-interpreted as a BSON type and comes back in another shape. Use the PHP serializer
-for such messages.
+Beware that a nested object made of a single Extended JSON key is read as the BSON
+type it denotes, and comes back in another shape:
+
+```
+{"paidAt":{"$date":1700000000000}}  =>  {"paidAt":{"$date":"2023-11-14T22:13:20Z"}}
+{"count":{"$numberInt":"7"}}        =>  {"count":7}
+```
+
+Only `$date` and the `$number*` wrappers are affected. Use the PHP serializer for
+messages carrying such fields.
 
 Resources
 ---------

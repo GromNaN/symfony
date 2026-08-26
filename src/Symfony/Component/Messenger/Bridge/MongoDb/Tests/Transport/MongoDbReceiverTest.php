@@ -88,6 +88,31 @@ class MongoDbReceiverTest extends TestCase
         $this->assertEquals(new DummyMessage('Hi'), $envelopes[0]->getMessage());
     }
 
+    #[RequiresPhpExtension('mongodb')]
+    public function testItReadsAnExtendedJsonValueInItsBsonShape()
+    {
+        $document = $this->createDocument(['body' => '', 'headers' => ['type' => DummyMessage::class]]);
+        $document->body = Document::fromJSON('{"paidAt":{"$date":1700000000000}}');
+
+        $connection = $this->createStub(Connection::class);
+        $connection->method('get')->willReturn($document);
+
+        $serializer = $this->createMock(SerializerInterface::class);
+        $serializer->expects($this->once())
+            ->method('decode')
+            ->with($this->callback(static function (array $encodedEnvelope): bool {
+                // the millisecond timestamp was read as a BSON date
+                self::assertJsonStringEqualsJsonString('{"paidAt":{"$date":"2023-11-14T22:13:20Z"}}', $encodedEnvelope['body']);
+
+                return true;
+            }))
+            ->willReturn(new Envelope(new DummyMessage('Hi')));
+
+        $receiver = new MongoDbReceiver($connection, $serializer);
+
+        $this->assertCount(1, $receiver->get());
+    }
+
     public function testItReturnsEmptyWhenThereAreNoMessages()
     {
         $connection = $this->createStub(Connection::class);

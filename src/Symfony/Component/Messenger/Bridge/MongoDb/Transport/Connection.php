@@ -326,15 +326,17 @@ class Connection
     }
 
     /**
-     * A JSON body is stored as a native BSON sub-document, so the message is
-     * queryable from the database instead of being an opaque string.
+     * A JSON body is stored as a native BSON sub-document: the message is
+     * queryable and indexable from the database instead of being an opaque
+     * string, and numbers and dates keep their type, stored in binary form
+     * instead of text.
      *
      * Returns null when the body is not a JSON object, in which case it is
      * stored as a string.
      */
     private static function parseJsonBody(string $body): ?Document
     {
-        if (!str_starts_with(ltrim($body), '{')) {
+        if (!str_starts_with($body, '{')) {
             return null;
         }
 
