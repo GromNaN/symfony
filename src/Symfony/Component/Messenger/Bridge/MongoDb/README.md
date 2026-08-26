@@ -19,6 +19,37 @@ keep working:
 MESSENGER_TRANSPORT_DSN=mongodb+srv://mongodb.example.com/db_name?replicaSet=repl&connectTimeoutMS=3000
 ```
 
+Message body
+------------
+
+The Serializer component produces a JSON body, unlike the PHP serializer used by
+default. It is set on the transport, and its format is already `json`:
+
+```yaml
+# config/packages/messenger.yaml
+framework:
+    messenger:
+        transports:
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                serializer: messenger.transport.symfony_serializer
+```
+
+The body and each header value holding JSON are stored as native BSON: an object as
+a sub-document, an array as a packed array. The message fields and the stamps are
+then queryable and indexable:
+
+```php
+$collection = $client->getCollection('db_name', 'messenger_messages');
+$pending = $collection->find(['body.orderId' => 1234]);
+```
+
+Anything else, such as the output of the PHP serializer, is stored as a string.
+
+The document is read back as Relaxed Extended JSON, so a nested `$date` or
+`$number*` value comes back in another shape: `{"count":{"$numberInt":"7"}}` becomes
+`{"count":7}`.
+
 Resources
 ---------
 

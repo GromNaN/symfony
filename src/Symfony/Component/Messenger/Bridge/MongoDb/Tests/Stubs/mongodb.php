@@ -181,19 +181,6 @@ namespace MongoDB\Driver\Exception {
     }
 }
 
-namespace MongoDB\Model {
-    if (!class_exists(BSONDocument::class, \extension_loaded('mongodb'))) {
-        #[\AllowDynamicProperties]
-        class BSONDocument extends \ArrayObject
-        {
-            public function __construct(array $input = [], int $flags = \ArrayObject::ARRAY_AS_PROPS, string $iteratorClass = \ArrayIterator::class)
-            {
-                parent::__construct($input, $flags, $iteratorClass);
-            }
-        }
-    }
-}
-
 namespace MongoDB\Operation {
     if (!class_exists(FindOneAndUpdate::class, \extension_loaded('mongodb'))) {
         class FindOneAndUpdate

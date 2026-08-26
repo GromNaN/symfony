@@ -13,7 +13,9 @@ namespace Symfony\Component\Messenger\Bridge\MongoDb\Tests\Transport;
 
 require_once __DIR__.'/../Stubs/mongodb.php';
 
+use MongoDB\BSON\Document;
 use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\PackedArray;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Client;
 use MongoDB\Collection;
@@ -22,15 +24,17 @@ use MongoDB\Driver\CursorInterface;
 use MongoDB\Driver\Exception\RuntimeException;
 use MongoDB\Driver\WriteConcern;
 use MongoDB\InsertOneResult;
-use MongoDB\Model\BSONDocument;
 use MongoDB\Operation\FindOneAndUpdate;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Bridge\MongoDb\Transport\Connection;
 use Symfony\Component\Messenger\Exception\InvalidArgumentException;
 use Symfony\Component\Messenger\Exception\TransportException;
 
+#[RequiresPhpExtension('mongodb')]
 class ConnectionTest extends TestCase
 {
     public function testFromDsn()
@@ -174,7 +178,7 @@ class ConnectionTest extends TestCase
                     'writeConcern' => new WriteConcern(WriteConcern::MAJORITY),
                     'returnDocument' => FindOneAndUpdate::RETURN_DOCUMENT_AFTER,
                     'sort' => ['availableAt' => 1],
-                    'typeMap' => ['root' => BSONDocument::class],
+                    'typeMap' => ['root' => 'bson'],
                 ])
             )
             ->willReturn($document);
@@ -232,12 +236,11 @@ class ConnectionTest extends TestCase
             ->method('insertOne')
             ->with(
                 $this->callback(static function ($document) use ($clock): bool {
-                    self::assertInstanceOf(BSONDocument::class, $document);
-                    self::assertSame('serializedEnvelope', $document->body);
-                    self::assertEquals(new BSONDocument(['type' => 'foo']), $document->headers);
-                    self::assertSame('foobar', $document->queueName);
-                    self::assertEquals(new UTCDateTime($clock->now()), $document->createdAt);
-                    self::assertEquals(new UTCDateTime($clock->now()), $document->availableAt);
+                    self::assertSame('serializedEnvelope', $document['body']);
+                    self::assertEquals(Document::fromPHP(['type' => 'foo']), $document['headers']);
+                    self::assertSame('foobar', $document['queueName']);
+                    self::assertEquals(new UTCDateTime($clock->now()), $document['createdAt']);
+                    self::assertEquals(new UTCDateTime($clock->now()), $document['availableAt']);
 
                     return true;
                 }),
@@ -248,6 +251,78 @@ class ConnectionTest extends TestCase
         $connection = new Connection($collection, 'foobar', 3_600, $clock);
 
         $this->assertSame($objectId, $connection->send('serializedEnvelope', ['type' => 'foo']));
+    }
+
+    public function testSendStoresAJsonBodyAsADocument()
+    {
+        $insertOneResult = $this->createStub(InsertOneResult::class);
+        $insertOneResult->method('getInsertedId')->willReturn(new ObjectId());
+
+        $collection = $this->createMock(Collection::class);
+        $collection->expects($this->once())
+            ->method('insertOne')
+            ->with(
+                $this->callback(static function ($document): bool {
+                    self::assertEquals(Document::fromJSON('{"foo":"bar"}'), $document['body']);
+
+                    return true;
+                }),
+                $this->anything()
+            )
+            ->willReturn($insertOneResult);
+
+        $connection = new Connection($collection, 'foobar', 3_600);
+        $connection->send('{"foo":"bar"}');
+    }
+
+    public function testSendStoresAJsonHeaderAsAPackedArray()
+    {
+        $insertOneResult = $this->createStub(InsertOneResult::class);
+        $insertOneResult->method('getInsertedId')->willReturn(new ObjectId());
+
+        $collection = $this->createMock(Collection::class);
+        $collection->expects($this->once())
+            ->method('insertOne')
+            ->with(
+                $this->callback(static function ($document): bool {
+                    self::assertSame('App\Message\Foo', $document['headers']['type']);
+                    self::assertEquals(PackedArray::fromJSON('[{"retryCount":0}]'), $document['headers']['X-Message-Stamp-Foo']);
+
+                    return true;
+                }),
+                $this->anything()
+            )
+            ->willReturn($insertOneResult);
+
+        $connection = new Connection($collection, 'foobar', 3_600);
+        $connection->send('{"foo":"bar"}', ['type' => 'App\Message\Foo', 'X-Message-Stamp-Foo' => '[{"retryCount":0}]']);
+    }
+
+    #[TestWith(['{"foo":'], 'truncated JSON')]
+    #[TestWith(['[1,2'], 'truncated JSON array')]
+    #[TestWith(['{not json at all}'], 'braces without JSON')]
+    #[TestWith(['"scalar"'], 'JSON scalar')]
+    #[TestWith(['serializedEnvelope'], 'not JSON at all')]
+    public function testSendStoresAnyOtherBodyAsAString(string $body)
+    {
+        $insertOneResult = $this->createStub(InsertOneResult::class);
+        $insertOneResult->method('getInsertedId')->willReturn(new ObjectId());
+
+        $collection = $this->createMock(Collection::class);
+        $collection->expects($this->once())
+            ->method('insertOne')
+            ->with(
+                $this->callback(static function ($document) use ($body): bool {
+                    self::assertSame($body, $document['body']);
+
+                    return true;
+                }),
+                $this->anything()
+            )
+            ->willReturn($insertOneResult);
+
+        $connection = new Connection($collection, 'foobar', 3_600);
+        $connection->send($body);
     }
 
     public function testSendWithDelay()
@@ -263,9 +338,8 @@ class ConnectionTest extends TestCase
             ->method('insertOne')
             ->with(
                 $this->callback(static function ($document) use ($clock): bool {
-                    self::assertInstanceOf(BSONDocument::class, $document);
-                    self::assertEquals(new UTCDateTime($clock->now()), $document->createdAt);
-                    self::assertEquals(new UTCDateTime($clock->now()->modify('+100 seconds')), $document->availableAt);
+                    self::assertEquals(new UTCDateTime($clock->now()), $document['createdAt']);
+                    self::assertEquals(new UTCDateTime($clock->now()->modify('+100 seconds')), $document['availableAt']);
 
                     return true;
                 }),
@@ -368,14 +442,14 @@ class ConnectionTest extends TestCase
 
     public function testFind()
     {
-        $document = new BSONDocument();
+        $document = Document::fromPHP(['_id' => new ObjectId()]);
         $objectId = new ObjectId();
         $collection = $this->createMock(Collection::class);
         $collection->expects($this->once())
             ->method('findOne')
             ->with(
                 $this->equalTo(['_id' => $objectId]),
-                ['typeMap' => ['root' => BSONDocument::class]]
+                ['typeMap' => ['root' => 'bson']]
             )
             ->willReturn($document);
 
@@ -392,7 +466,7 @@ class ConnectionTest extends TestCase
             ->method('find')
             ->with($this->anything(), $this->callback(static function (array $options): bool {
                 self::assertSame(50, $options['limit']);
-                self::assertSame(['root' => BSONDocument::class], $options['typeMap']);
+                self::assertSame(['root' => 'bson'], $options['typeMap']);
 
                 return true;
             }))
@@ -431,11 +505,8 @@ class ConnectionTest extends TestCase
         $connection->setup();
     }
 
-    private function createDocumentDeliveredTo(string $deliveredTo): BSONDocument
+    private function createDocumentDeliveredTo(string $deliveredTo): Document
     {
-        $document = new BSONDocument();
-        $document->deliveredTo = $deliveredTo;
-
-        return $document;
+        return Document::fromPHP(['deliveredTo' => $deliveredTo]);
     }
 }

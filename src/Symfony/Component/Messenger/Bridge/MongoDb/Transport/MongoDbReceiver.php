@@ -11,7 +11,8 @@
 
 namespace Symfony\Component\Messenger\Bridge\MongoDb\Transport;
 
-use MongoDB\Model\BSONDocument;
+use MongoDB\BSON\Document;
+use MongoDB\BSON\PackedArray;
 use Symfony\Component\Messenger\Bridge\MongoDb\Stamp\MongoDbReceivedStamp;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\LogicException;
@@ -73,7 +74,7 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
     {
         $document = $this->connection->find((string) $id);
 
-        if (!$document instanceof BSONDocument) {
+        if (!$document instanceof Document) {
             return null;
         }
 
@@ -90,20 +91,14 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
         return $envelope->last(MongoDbReceivedStamp::class) ?? throw new LogicException('No MongoDbReceivedStamp found on the Envelope.');
     }
 
-    private function createEnvelope(BSONDocument $document): Envelope
+    private function createEnvelope(Document $document): Envelope
     {
         $documentId = (string) $document['_id'];
 
-        if (($document['headers'] ?? null) instanceof \stdClass) {
-            $headers = (array) $document['headers'];
-        } else {
-            $headers = null;
-        }
-
         try {
             $envelope = $this->serializer->decode([
-                'body' => $document['body'] ?? null,
-                'headers' => $headers,
+                'body' => self::decodeValue($document['body'] ?? null),
+                'headers' => self::decodeHeaders($document['headers'] ?? null),
             ]);
         } catch (MessageDecodingFailedException $exception) {
             $this->connection->reject($documentId);
@@ -115,5 +110,28 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
             new MongoDbReceivedStamp($documentId),
             new TransportMessageIdStamp($documentId)
         );
+    }
+
+    /**
+     * @return array<string, string>|null
+     */
+    private static function decodeHeaders(mixed $headers): ?array
+    {
+        $headers = match (true) {
+            $headers instanceof Document => iterator_to_array($headers),
+            $headers instanceof \stdClass => (array) $headers,
+            default => null,
+        };
+
+        return null === $headers ? null : array_map(self::decodeValue(...), $headers);
+    }
+
+    /**
+     * A value stored as native BSON holds JSON, as written by Connection::send(),
+     * so it is turned back into the JSON string the serializer produced.
+     */
+    private static function decodeValue(mixed $value): mixed
+    {
+        return $value instanceof Document || $value instanceof PackedArray ? $value->toRelaxedExtendedJSON() : $value;
     }
 }

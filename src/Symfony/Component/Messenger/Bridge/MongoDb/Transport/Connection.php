@@ -11,14 +11,15 @@
 
 namespace Symfony\Component\Messenger\Bridge\MongoDb\Transport;
 
+use MongoDB\BSON\Document;
 use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\PackedArray;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Client;
 use MongoDB\Collection;
 use MongoDB\Driver\Exception\Exception as MongoDriverException;
 use MongoDB\Driver\Session;
 use MongoDB\Driver\WriteConcern;
-use MongoDB\Model\BSONDocument;
 use MongoDB\Operation\FindOneAndUpdate;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Exception\InvalidArgumentException;
@@ -117,7 +118,7 @@ class Connection
     /**
      * @throws TransportException
      */
-    public function get(): ?BSONDocument
+    public function get(): ?Document
     {
         $options = $this->getWriteOptions();
         $options['returnDocument'] = FindOneAndUpdate::RETURN_DOCUMENT_AFTER;
@@ -139,7 +140,7 @@ class Connection
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
 
-        if (!$updatedDocument instanceof BSONDocument) {
+        if (!$updatedDocument instanceof Document) {
             return null;
         }
 
@@ -164,12 +165,13 @@ class Connection
         $now = $this->now();
         $availableAt = $now->modify(\sprintf('+%d milliseconds', $delay));
 
-        $document = new BSONDocument();
-        $document['body'] = $body;
-        $document['headers'] = new BSONDocument($headers);
-        $document['queueName'] = $this->queueName;
-        $document['createdAt'] = new UTCDateTime($now);
-        $document['availableAt'] = new UTCDateTime($availableAt);
+        $document = Document::fromPHP([
+            'body' => self::parseJson($body) ?? $body,
+            'headers' => Document::fromPHP(array_map(static fn (string $value): mixed => self::parseJson($value) ?? $value, $headers)),
+            'queueName' => $this->queueName,
+            'createdAt' => new UTCDateTime($now),
+            'availableAt' => new UTCDateTime($availableAt),
+        ]);
 
         try {
             $insertResult = $this->collection->insertOne($document, $this->getWriteOptions($session));
@@ -231,7 +233,7 @@ class Connection
     /**
      * @throws TransportException
      */
-    public function find(string $id): ?BSONDocument
+    public function find(string $id): ?Document
     {
         try {
             $document = $this->collection->findOne(['_id' => new ObjectId($id)], $this->setTypeMapOption());
@@ -239,11 +241,11 @@ class Connection
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
 
-        return $document instanceof BSONDocument ? $document : null;
+        return $document instanceof Document ? $document : null;
     }
 
     /**
-     * @return iterable<BSONDocument>
+     * @return iterable<Document>
      *
      * @throws TransportException
      */
@@ -324,15 +326,37 @@ class Connection
     }
 
     /**
+     * JSON is stored as native BSON, an object as a sub-document and an array as
+     * a packed array: the message is queryable and indexable from the database
+     * instead of being an opaque string, and numbers and dates keep their type,
+     * stored in binary form instead of text.
+     *
+     * Returns null for anything else, which is then stored as a string.
+     */
+    private static function parseJson(string $value): Document|PackedArray|null
+    {
+        try {
+            return match ($value[0] ?? null) {
+                '{' => Document::fromJSON($value),
+                '[' => PackedArray::fromJSON($value),
+                default => null,
+            };
+        } catch (MongoDriverException) {
+            return null;
+        }
+    }
+
+    /**
      * @param array<string, mixed> $readOptions
      *
      * @return array<string, mixed>
      */
     private function setTypeMapOption(array $readOptions = []): array
     {
-        $readOptions['typeMap'] = [
-            'root' => BSONDocument::class,
-        ];
+        // Read the whole message as raw BSON: the receiver turns the values
+        // stored as native BSON back into the JSON strings the serializer
+        // expects, and a value stored as a string is left untouched.
+        $readOptions['typeMap'] = ['root' => 'bson'];
 
         return $readOptions;
     }
