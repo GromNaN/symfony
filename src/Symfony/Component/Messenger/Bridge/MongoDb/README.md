@@ -22,6 +22,21 @@ MESSENGER_TRANSPORT_DSN=mongodb+srv://mongodb.example.com/db_name?replicaSet=rep
 Message body
 ------------
 
+The Messenger serializer produces a JSON body with this configuration:
+
+```yaml
+# config/packages/messenger.yaml
+framework:
+    messenger:
+        serializer:
+            default_serializer: messenger.transport.symfony_serializer
+            symfony_serializer:
+                format: json
+
+        transports:
+            async: '%env(MESSENGER_TRANSPORT_DSN)%'
+```
+
 A body holding a JSON object is stored as a native BSON sub-document, so the message
 fields are queryable and indexable:
 
