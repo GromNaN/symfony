@@ -16,7 +16,6 @@ require_once __DIR__.'/../Stubs/mongodb.php';
 use MongoDB\BSON\Document;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\PackedArray;
-use MongoDB\Model\BSONDocument;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Bridge\MongoDb\Stamp\MongoDbReceivedStamp;
@@ -31,6 +30,7 @@ use Symfony\Component\Messenger\Transport\Serialization\PhpSerializer;
 use Symfony\Component\Messenger\Transport\Serialization\Serializer;
 use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 
+#[RequiresPhpExtension('mongodb')]
 class MongoDbReceiverTest extends TestCase
 {
     public function testItReturnsTheDecodedMessageToTheHandler()
@@ -49,18 +49,16 @@ class MongoDbReceiverTest extends TestCase
         $message = $envelope->getMessage();
         $this->assertInstanceOf(DummyMessage::class, $message);
         $this->assertSame('Hi', $message->getMessage());
-        $this->assertSame((string) $document->_id, $envelope->last(MongoDbReceivedStamp::class)->getId());
-        $this->assertSame((string) $document->_id, $envelope->last(TransportMessageIdStamp::class)->getId());
+        $this->assertSame((string) $document['_id'], $envelope->last(MongoDbReceivedStamp::class)->getId());
+        $this->assertSame((string) $document['_id'], $envelope->last(TransportMessageIdStamp::class)->getId());
     }
 
-    #[RequiresPhpExtension('mongodb')]
     public function testItReadsABodyStoredAsADocument()
     {
         $serializer = Serializer::create();
         $encodedEnvelope = $serializer->encode(new Envelope(new DummyMessage('Hi')));
 
-        $document = $this->createDocument($encodedEnvelope);
-        $document->body = Document::fromJSON($encodedEnvelope['body']);
+        $document = $this->createDocument(['body' => Document::fromJSON($encodedEnvelope['body']), 'headers' => $encodedEnvelope['headers']]);
 
         $connection = $this->createStub(Connection::class);
         $connection->method('get')->willReturn($document);
@@ -72,12 +70,10 @@ class MongoDbReceiverTest extends TestCase
         $this->assertEquals(new DummyMessage('Hi'), $envelopes[0]->getMessage());
     }
 
-    #[RequiresPhpExtension('mongodb')]
     public function testItReadsABodyStoredAsADocumentWithoutTheContentType()
     {
         // a message written by another producer, straight into the collection
-        $document = $this->createDocument(['body' => '', 'headers' => ['type' => DummyMessage::class]]);
-        $document->body = Document::fromJSON('{"message":"Hi"}');
+        $document = $this->createDocument(['body' => Document::fromJSON('{"message":"Hi"}'), 'headers' => ['type' => DummyMessage::class]]);
 
         $connection = $this->createStub(Connection::class);
         $connection->method('get')->willReturn($document);
@@ -89,11 +85,9 @@ class MongoDbReceiverTest extends TestCase
         $this->assertEquals(new DummyMessage('Hi'), $envelopes[0]->getMessage());
     }
 
-    #[RequiresPhpExtension('mongodb')]
     public function testItReadsAnExtendedJsonValueInItsBsonShape()
     {
-        $document = $this->createDocument(['body' => '', 'headers' => ['type' => DummyMessage::class]]);
-        $document->body = Document::fromJSON('{"paidAt":{"$date":1700000000000}}');
+        $document = $this->createDocument(['body' => Document::fromJSON('{"paidAt":{"$date":1700000000000}}'), 'headers' => ['type' => DummyMessage::class]]);
 
         $connection = $this->createStub(Connection::class);
         $connection->method('get')->willReturn($document);
@@ -114,14 +108,14 @@ class MongoDbReceiverTest extends TestCase
         $this->assertCount(1, $receiver->get());
     }
 
-    #[RequiresPhpExtension('mongodb')]
     public function testItReadsHeadersStoredAsNativeBson()
     {
-        $document = $this->createDocument(['body' => '']);
-        $document->body = Document::fromJSON('{"message":"Hi"}');
-        $document->headers = Document::fromPHP([
-            'type' => DummyMessage::class,
-            'X-Message-Stamp-Foo' => PackedArray::fromJSON('[{"retryCount":0}]'),
+        $document = $this->createDocument([
+            'body' => Document::fromJSON('{"message":"Hi"}'),
+            'headers' => Document::fromPHP([
+                'type' => DummyMessage::class,
+                'X-Message-Stamp-Foo' => PackedArray::fromJSON('[{"retryCount":0}]'),
+            ]),
         ]);
 
         $connection = $this->createStub(Connection::class);
@@ -159,7 +153,7 @@ class MongoDbReceiverTest extends TestCase
 
         $connection = $this->createMock(Connection::class);
         $connection->method('get')->willReturn($document);
-        $connection->expects($this->once())->method('reject')->with((string) $document->_id);
+        $connection->expects($this->once())->method('reject')->with((string) $document['_id']);
 
         $serializer = $this->createStub(SerializerInterface::class);
         $serializer->method('decode')->willThrowException(new MessageDecodingFailedException());
@@ -224,11 +218,11 @@ class MongoDbReceiverTest extends TestCase
         $document = $this->createDocument($serializer->encode(new Envelope(new DummyMessage('Hi'))));
 
         $connection = $this->createMock(Connection::class);
-        $connection->expects($this->once())->method('find')->with((string) $document->_id)->willReturn($document);
+        $connection->expects($this->once())->method('find')->with((string) $document['_id'])->willReturn($document);
 
         $receiver = new MongoDbReceiver($connection, $serializer);
 
-        $this->assertSame('Hi', $receiver->find((string) $document->_id)->getMessage()->getMessage());
+        $this->assertSame('Hi', $receiver->find((string) $document['_id'])->getMessage()->getMessage());
     }
 
     public function testFindReturnsNullWhenThereIsNoMatch()
@@ -252,15 +246,16 @@ class MongoDbReceiverTest extends TestCase
     }
 
     /**
-     * @param array{body: string, headers?: array<string, string>} $encodedEnvelope
+     * @param array{body: mixed, headers?: array<string, string>|Document} $encodedEnvelope
      */
-    private function createDocument(array $encodedEnvelope): BSONDocument
+    private function createDocument(array $encodedEnvelope): Document
     {
-        $document = new BSONDocument();
-        $document->_id = new ObjectId();
-        $document->body = $encodedEnvelope['body'];
-        $document->headers = (object) ($encodedEnvelope['headers'] ?? []);
+        $headers = $encodedEnvelope['headers'] ?? [];
 
-        return $document;
+        return Document::fromPHP([
+            '_id' => new ObjectId(),
+            'body' => $encodedEnvelope['body'],
+            'headers' => \is_array($headers) ? (object) $headers : $headers,
+        ]);
     }
 }

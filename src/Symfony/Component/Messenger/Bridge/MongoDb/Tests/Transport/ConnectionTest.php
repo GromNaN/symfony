@@ -24,7 +24,6 @@ use MongoDB\Driver\CursorInterface;
 use MongoDB\Driver\Exception\RuntimeException;
 use MongoDB\Driver\WriteConcern;
 use MongoDB\InsertOneResult;
-use MongoDB\Model\BSONDocument;
 use MongoDB\Operation\FindOneAndUpdate;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
@@ -35,6 +34,7 @@ use Symfony\Component\Messenger\Bridge\MongoDb\Transport\Connection;
 use Symfony\Component\Messenger\Exception\InvalidArgumentException;
 use Symfony\Component\Messenger\Exception\TransportException;
 
+#[RequiresPhpExtension('mongodb')]
 class ConnectionTest extends TestCase
 {
     public function testFromDsn()
@@ -178,7 +178,7 @@ class ConnectionTest extends TestCase
                     'writeConcern' => new WriteConcern(WriteConcern::MAJORITY),
                     'returnDocument' => FindOneAndUpdate::RETURN_DOCUMENT_AFTER,
                     'sort' => ['availableAt' => 1],
-                    'typeMap' => ['root' => BSONDocument::class, 'document' => 'bson', 'array' => 'bson'],
+                    'typeMap' => ['root' => 'bson'],
                 ])
             )
             ->willReturn($document);
@@ -236,12 +236,11 @@ class ConnectionTest extends TestCase
             ->method('insertOne')
             ->with(
                 $this->callback(static function ($document) use ($clock): bool {
-                    self::assertInstanceOf(BSONDocument::class, $document);
-                    self::assertSame('serializedEnvelope', $document->body);
-                    self::assertEquals(new BSONDocument(['type' => 'foo']), $document->headers);
-                    self::assertSame('foobar', $document->queueName);
-                    self::assertEquals(new UTCDateTime($clock->now()), $document->createdAt);
-                    self::assertEquals(new UTCDateTime($clock->now()), $document->availableAt);
+                    self::assertSame('serializedEnvelope', $document['body']);
+                    self::assertEquals(Document::fromPHP(['type' => 'foo']), $document['headers']);
+                    self::assertSame('foobar', $document['queueName']);
+                    self::assertEquals(new UTCDateTime($clock->now()), $document['createdAt']);
+                    self::assertEquals(new UTCDateTime($clock->now()), $document['availableAt']);
 
                     return true;
                 }),
@@ -254,7 +253,6 @@ class ConnectionTest extends TestCase
         $this->assertSame($objectId, $connection->send('serializedEnvelope', ['type' => 'foo']));
     }
 
-    #[RequiresPhpExtension('mongodb')]
     public function testSendStoresAJsonBodyAsADocument()
     {
         $insertOneResult = $this->createStub(InsertOneResult::class);
@@ -265,7 +263,7 @@ class ConnectionTest extends TestCase
             ->method('insertOne')
             ->with(
                 $this->callback(static function ($document): bool {
-                    self::assertEquals(Document::fromJSON('{"foo":"bar"}'), $document->body);
+                    self::assertEquals(Document::fromJSON('{"foo":"bar"}'), $document['body']);
 
                     return true;
                 }),
@@ -277,8 +275,6 @@ class ConnectionTest extends TestCase
         $connection->send('{"foo":"bar"}');
     }
 
-    #[RequiresPhpExtension('mongodb')]
-    #[RequiresPhpExtension('mongodb')]
     public function testSendStoresAJsonHeaderAsAPackedArray()
     {
         $insertOneResult = $this->createStub(InsertOneResult::class);
@@ -289,8 +285,8 @@ class ConnectionTest extends TestCase
             ->method('insertOne')
             ->with(
                 $this->callback(static function ($document): bool {
-                    self::assertSame('App\Message\Foo', $document->headers['type']);
-                    self::assertEquals(PackedArray::fromJSON('[{"retryCount":0}]'), $document->headers['X-Message-Stamp-Foo']);
+                    self::assertSame('App\Message\Foo', $document['headers']['type']);
+                    self::assertEquals(PackedArray::fromJSON('[{"retryCount":0}]'), $document['headers']['X-Message-Stamp-Foo']);
 
                     return true;
                 }),
@@ -317,7 +313,7 @@ class ConnectionTest extends TestCase
             ->method('insertOne')
             ->with(
                 $this->callback(static function ($document) use ($body): bool {
-                    self::assertSame($body, $document->body);
+                    self::assertSame($body, $document['body']);
 
                     return true;
                 }),
@@ -342,9 +338,8 @@ class ConnectionTest extends TestCase
             ->method('insertOne')
             ->with(
                 $this->callback(static function ($document) use ($clock): bool {
-                    self::assertInstanceOf(BSONDocument::class, $document);
-                    self::assertEquals(new UTCDateTime($clock->now()), $document->createdAt);
-                    self::assertEquals(new UTCDateTime($clock->now()->modify('+100 seconds')), $document->availableAt);
+                    self::assertEquals(new UTCDateTime($clock->now()), $document['createdAt']);
+                    self::assertEquals(new UTCDateTime($clock->now()->modify('+100 seconds')), $document['availableAt']);
 
                     return true;
                 }),
@@ -447,14 +442,14 @@ class ConnectionTest extends TestCase
 
     public function testFind()
     {
-        $document = new BSONDocument();
+        $document = Document::fromPHP(['_id' => new ObjectId()]);
         $objectId = new ObjectId();
         $collection = $this->createMock(Collection::class);
         $collection->expects($this->once())
             ->method('findOne')
             ->with(
                 $this->equalTo(['_id' => $objectId]),
-                ['typeMap' => ['root' => BSONDocument::class, 'document' => 'bson', 'array' => 'bson']]
+                ['typeMap' => ['root' => 'bson']]
             )
             ->willReturn($document);
 
@@ -471,7 +466,7 @@ class ConnectionTest extends TestCase
             ->method('find')
             ->with($this->anything(), $this->callback(static function (array $options): bool {
                 self::assertSame(50, $options['limit']);
-                self::assertSame(['root' => BSONDocument::class, 'document' => 'bson', 'array' => 'bson'], $options['typeMap']);
+                self::assertSame(['root' => 'bson'], $options['typeMap']);
 
                 return true;
             }))
@@ -510,11 +505,8 @@ class ConnectionTest extends TestCase
         $connection->setup();
     }
 
-    private function createDocumentDeliveredTo(string $deliveredTo): BSONDocument
+    private function createDocumentDeliveredTo(string $deliveredTo): Document
     {
-        $document = new BSONDocument();
-        $document->deliveredTo = $deliveredTo;
-
-        return $document;
+        return Document::fromPHP(['deliveredTo' => $deliveredTo]);
     }
 }

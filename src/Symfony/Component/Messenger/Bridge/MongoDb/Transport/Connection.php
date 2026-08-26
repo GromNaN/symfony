@@ -20,7 +20,6 @@ use MongoDB\Collection;
 use MongoDB\Driver\Exception\Exception as MongoDriverException;
 use MongoDB\Driver\Session;
 use MongoDB\Driver\WriteConcern;
-use MongoDB\Model\BSONDocument;
 use MongoDB\Operation\FindOneAndUpdate;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Exception\InvalidArgumentException;
@@ -119,7 +118,7 @@ class Connection
     /**
      * @throws TransportException
      */
-    public function get(): ?BSONDocument
+    public function get(): ?Document
     {
         $options = $this->getWriteOptions();
         $options['returnDocument'] = FindOneAndUpdate::RETURN_DOCUMENT_AFTER;
@@ -141,7 +140,7 @@ class Connection
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
 
-        if (!$updatedDocument instanceof BSONDocument) {
+        if (!$updatedDocument instanceof Document) {
             return null;
         }
 
@@ -166,13 +165,13 @@ class Connection
         $now = $this->now();
         $availableAt = $now->modify(\sprintf('+%d milliseconds', $delay));
 
-        $document = new BSONDocument();
-
-        $document['body'] = self::parseJson($body) ?? $body;
-        $document['headers'] = new BSONDocument(array_map(static fn (string $value): mixed => self::parseJson($value) ?? $value, $headers));
-        $document['queueName'] = $this->queueName;
-        $document['createdAt'] = new UTCDateTime($now);
-        $document['availableAt'] = new UTCDateTime($availableAt);
+        $document = Document::fromPHP([
+            'body' => self::parseJson($body) ?? $body,
+            'headers' => Document::fromPHP(array_map(static fn (string $value): mixed => self::parseJson($value) ?? $value, $headers)),
+            'queueName' => $this->queueName,
+            'createdAt' => new UTCDateTime($now),
+            'availableAt' => new UTCDateTime($availableAt),
+        ]);
 
         try {
             $insertResult = $this->collection->insertOne($document, $this->getWriteOptions($session));
@@ -234,7 +233,7 @@ class Connection
     /**
      * @throws TransportException
      */
-    public function find(string $id): ?BSONDocument
+    public function find(string $id): ?Document
     {
         try {
             $document = $this->collection->findOne(['_id' => new ObjectId($id)], $this->setTypeMapOption());
@@ -242,11 +241,11 @@ class Connection
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
 
-        return $document instanceof BSONDocument ? $document : null;
+        return $document instanceof Document ? $document : null;
     }
 
     /**
-     * @return iterable<BSONDocument>
+     * @return iterable<Document>
      *
      * @throws TransportException
      */
@@ -354,14 +353,10 @@ class Connection
      */
     private function setTypeMapOption(array $readOptions = []): array
     {
-        $readOptions['typeMap'] = [
-            'root' => BSONDocument::class,
-            // Values stored as native BSON are read back as raw BSON, so the
-            // receiver can turn them into the JSON strings the serializer
-            // expects. A value stored as a string is left untouched.
-            'document' => 'bson',
-            'array' => 'bson',
-        ];
+        // Read the whole message as raw BSON: the receiver turns the values
+        // stored as native BSON back into the JSON strings the serializer
+        // expects, and a value stored as a string is left untouched.
+        $readOptions['typeMap'] = ['root' => 'bson'];
 
         return $readOptions;
     }

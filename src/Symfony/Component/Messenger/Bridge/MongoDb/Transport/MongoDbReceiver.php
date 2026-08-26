@@ -13,7 +13,6 @@ namespace Symfony\Component\Messenger\Bridge\MongoDb\Transport;
 
 use MongoDB\BSON\Document;
 use MongoDB\BSON\PackedArray;
-use MongoDB\Model\BSONDocument;
 use Symfony\Component\Messenger\Bridge\MongoDb\Stamp\MongoDbReceivedStamp;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\LogicException;
@@ -75,7 +74,7 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
     {
         $document = $this->connection->find((string) $id);
 
-        if (!$document instanceof BSONDocument) {
+        if (!$document instanceof Document) {
             return null;
         }
 
@@ -92,7 +91,7 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
         return $envelope->last(MongoDbReceivedStamp::class) ?? throw new LogicException('No MongoDbReceivedStamp found on the Envelope.');
     }
 
-    private function createEnvelope(BSONDocument $document): Envelope
+    private function createEnvelope(Document $document): Envelope
     {
         $documentId = (string) $document['_id'];
 
