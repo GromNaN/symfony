@@ -34,9 +34,13 @@ db.messenger_messages.find({ 'body.orderId': 1234 })
 Any other body, including the one produced by the default PHP serializer, is stored
 as a string.
 
-The document is read back as Relaxed Extended JSON, so a field named `$date`,
-`$oid` or `$numberInt` in the message would be interpreted as a BSON type and come
-back in another shape. Use the PHP serializer for such messages.
+A body stored as a sub-document is read back as Relaxed Extended JSON, whatever the
+content type, so a message written straight into the collection by another producer
+is handled as well.
+
+Beware that a field named `$date`, `$oid` or `$numberInt` in the message is
+interpreted as a BSON type and comes back in another shape. Use the PHP serializer
+for such messages.
 
 Resources
 ---------

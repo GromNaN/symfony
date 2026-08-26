@@ -72,21 +72,20 @@ class MongoDbReceiverTest extends TestCase
     }
 
     #[RequiresPhpExtension('mongodb')]
-    public function testItRejectsABodyStoredAsADocumentWithoutTheJsonContentType()
+    public function testItReadsABodyStoredAsADocumentWithoutTheContentType()
     {
-        $document = $this->createDocument(['body' => 'ignored', 'headers' => ['type' => DummyMessage::class]]);
+        // a message written by another producer, straight into the collection
+        $document = $this->createDocument(['body' => '', 'headers' => ['type' => DummyMessage::class]]);
         $document->body = Document::fromJSON('{"message":"Hi"}');
 
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $connection->method('get')->willReturn($document);
-        $connection->expects($this->once())->method('reject')->with((string) $document->_id);
 
         $receiver = new MongoDbReceiver($connection, Serializer::create());
+        $envelopes = $receiver->get();
 
-        $this->expectException(MessageDecodingFailedException::class);
-        $this->expectExceptionMessage('The message body is stored as a BSON document, but its content type is "null" instead of "application/json".');
-
-        $receiver->get();
+        $this->assertCount(1, $envelopes);
+        $this->assertEquals(new DummyMessage('Hi'), $envelopes[0]->getMessage());
     }
 
     public function testItReturnsEmptyWhenThereAreNoMessages()

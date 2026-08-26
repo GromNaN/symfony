@@ -103,7 +103,7 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
 
         try {
             $envelope = $this->serializer->decode([
-                'body' => $this->decodeBody($document, $headers),
+                'body' => self::decodeBody($document),
                 'headers' => $headers,
             ]);
         } catch (MessageDecodingFailedException $exception) {
@@ -119,23 +119,13 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
     }
 
     /**
-     * A body stored as a native BSON sub-document is turned back into the
-     * string the serializer produced, as told by the content type.
-     *
-     * @param array<string, string>|null $headers
+     * A body stored as a native BSON sub-document holds JSON, as written by
+     * Connection::send(), so it is turned back into a JSON string.
      */
-    private function decodeBody(BSONDocument $document, ?array $headers): mixed
+    private static function decodeBody(BSONDocument $document): mixed
     {
         $body = $document['body'] ?? null;
 
-        if (!$body instanceof Document) {
-            return $body;
-        }
-
-        if (Connection::CONTENT_TYPE_JSON !== ($headers['Content-Type'] ?? null)) {
-            throw new MessageDecodingFailedException(\sprintf('The message body is stored as a BSON document, but its content type is "%s" instead of "%s".', $headers['Content-Type'] ?? 'null', Connection::CONTENT_TYPE_JSON));
-        }
-
-        return $body->toRelaxedExtendedJSON();
+        return $body instanceof Document ? $body->toRelaxedExtendedJSON() : $body;
     }
 }
