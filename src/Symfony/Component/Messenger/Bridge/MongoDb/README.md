@@ -40,8 +40,9 @@ framework:
 A body holding a JSON object is stored as a native BSON sub-document, so the message
 fields are queryable and indexable:
 
-```javascript
-db.messenger_messages.find({ 'body.orderId': 1234 })
+```php
+$collection = $client->getCollection('db_name', 'messenger_messages');
+$pending = $collection->find(['body.orderId' => 1234]);
 ```
 
 Any other body, such as the output of the PHP serializer, is stored as a string.
