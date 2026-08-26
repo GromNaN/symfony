@@ -178,7 +178,7 @@ class ConnectionTest extends TestCase
                     'writeConcern' => new WriteConcern(WriteConcern::MAJORITY),
                     'returnDocument' => FindOneAndUpdate::RETURN_DOCUMENT_AFTER,
                     'sort' => ['availableAt' => 1],
-                    'typeMap' => ['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson', 'headers' => 'bson']],
+                    'typeMap' => ['root' => BSONDocument::class, 'document' => 'bson', 'array' => 'bson'],
                 ])
             )
             ->willReturn($document);
@@ -454,7 +454,7 @@ class ConnectionTest extends TestCase
             ->method('findOne')
             ->with(
                 $this->equalTo(['_id' => $objectId]),
-                ['typeMap' => ['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson', 'headers' => 'bson']]]
+                ['typeMap' => ['root' => BSONDocument::class, 'document' => 'bson', 'array' => 'bson']]
             )
             ->willReturn($document);
 
@@ -471,7 +471,7 @@ class ConnectionTest extends TestCase
             ->method('find')
             ->with($this->anything(), $this->callback(static function (array $options): bool {
                 self::assertSame(50, $options['limit']);
-                self::assertSame(['root' => BSONDocument::class, 'fieldPaths' => ['body' => 'bson', 'headers' => 'bson']], $options['typeMap']);
+                self::assertSame(['root' => BSONDocument::class, 'document' => 'bson', 'array' => 'bson'], $options['typeMap']);
 
                 return true;
             }))

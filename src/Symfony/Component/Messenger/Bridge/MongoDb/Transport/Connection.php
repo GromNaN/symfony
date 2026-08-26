@@ -359,7 +359,8 @@ class Connection
             // Values stored as native BSON are read back as raw BSON, so the
             // receiver can turn them into the JSON strings the serializer
             // expects. A value stored as a string is left untouched.
-            'fieldPaths' => ['body' => 'bson', 'headers' => 'bson'],
+            'document' => 'bson',
+            'array' => 'bson',
         ];
 
         return $readOptions;
