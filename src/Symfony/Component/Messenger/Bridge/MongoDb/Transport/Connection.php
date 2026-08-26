@@ -32,12 +32,6 @@ use Symfony\Component\Messenger\Exception\TransportException;
  */
 class Connection
 {
-    /**
-     * Content type of a JSON body, as set by the Messenger serializer. Such a
-     * body is stored as a native BSON sub-document.
-     */
-    public const CONTENT_TYPE_JSON = 'application/json';
-
     private const DEFAULT_OPTIONS = [
         'database' => null,
         'collection_name' => 'messenger_messages',
@@ -173,7 +167,7 @@ class Connection
 
         $document = new BSONDocument();
 
-        $document['body'] = self::parseJsonBody($body, $headers) ?? $body;
+        $document['body'] = self::parseJsonBody($body) ?? $body;
         $document['headers'] = new BSONDocument($headers);
         $document['queueName'] = $this->queueName;
         $document['createdAt'] = new UTCDateTime($now);
@@ -333,18 +327,14 @@ class Connection
 
     /**
      * A JSON body is stored as a native BSON sub-document, so the message is
-     * queryable from the database instead of being an opaque string. The
-     * "Content-Type" header, stored along with the message, tells the receiver
-     * how to read it back.
+     * queryable from the database instead of being an opaque string.
      *
      * Returns null when the body is not a JSON object, in which case it is
      * stored as a string.
-     *
-     * @param array<string, string> $headers
      */
-    private static function parseJsonBody(string $body, array $headers): ?Document
+    private static function parseJsonBody(string $body): ?Document
     {
-        if (self::CONTENT_TYPE_JSON !== ($headers['Content-Type'] ?? null) || !str_starts_with(ltrim($body), '{')) {
+        if (!str_starts_with(ltrim($body), '{')) {
             return null;
         }
 

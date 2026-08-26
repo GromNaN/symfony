@@ -22,21 +22,21 @@ MESSENGER_TRANSPORT_DSN=mongodb+srv://mongodb.example.com/db_name?replicaSet=rep
 Message body
 ------------
 
-A message body sent with the `Content-Type: application/json` header, as produced
-by the `messenger.transport.symfony_serializer` service with the `json` format, is
-stored as a native BSON sub-document instead of a string. The message fields are
-then queryable and indexable:
+A message body that holds a JSON object, as produced by the
+`messenger.transport.symfony_serializer` service with the `json` format, is stored
+as a native BSON sub-document instead of a string. The message fields are then
+queryable and indexable:
 
 ```javascript
 db.messenger_messages.find({ 'body.orderId': 1234 })
 ```
 
-Any other body, including the one produced by the default PHP serializer, is stored
-as a string.
+Any other body is stored as a string: one that does not start with an opening brace,
+such as the output of the default PHP serializer, and one that fails to parse as a
+JSON object.
 
-A body stored as a sub-document is read back as Relaxed Extended JSON, whatever the
-content type, so a message written straight into the collection by another producer
-is handled as well.
+A body stored as a sub-document is read back as Relaxed Extended JSON, so a message
+written straight into the collection by another producer is handled as well.
 
 Beware that a field named `$date`, `$oid` or `$numberInt` in the message is
 interpreted as a BSON type and comes back in another shape. Use the PHP serializer

@@ -273,16 +273,16 @@ class ConnectionTest extends TestCase
             ->willReturn($insertOneResult);
 
         $connection = new Connection($collection, 'foobar', 3_600);
-        $connection->send('{"foo":"bar"}', ['Content-Type' => 'application/json']);
+        $connection->send('{"foo":"bar"}');
     }
 
     #[RequiresPhpExtension('mongodb')]
-    #[TestWith(['{"foo":"bar"}', []], 'JSON without the content type')]
-    #[TestWith(['{"foo":"bar"}', ['Content-Type' => 'application/xml']], 'another content type')]
-    #[TestWith(['{"foo":', ['Content-Type' => 'application/json']], 'truncated JSON')]
-    #[TestWith(['[1,2]', ['Content-Type' => 'application/json']], 'JSON that is not an object')]
-    #[TestWith(['serializedEnvelope', []], 'not JSON at all')]
-    public function testSendStoresAnyOtherBodyAsAString(string $body, array $headers)
+    #[TestWith(['{"foo":'], 'truncated JSON')]
+    #[TestWith(['{not json at all}'], 'braces without JSON')]
+    #[TestWith(['[1,2]'], 'JSON that is not an object')]
+    #[TestWith(['"scalar"'], 'JSON scalar')]
+    #[TestWith(['serializedEnvelope'], 'not JSON at all')]
+    public function testSendStoresAnyOtherBodyAsAString(string $body)
     {
         $insertOneResult = $this->createStub(InsertOneResult::class);
         $insertOneResult->method('getInsertedId')->willReturn(new ObjectId());
@@ -301,7 +301,7 @@ class ConnectionTest extends TestCase
             ->willReturn($insertOneResult);
 
         $connection = new Connection($collection, 'foobar', 3_600);
-        $connection->send($body, $headers);
+        $connection->send($body);
     }
 
     public function testSendWithDelay()
