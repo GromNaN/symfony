@@ -33,6 +33,11 @@ class MongoDbTransportIntegrationTest extends TestCase
     private Client $client;
     private Connection $connection;
     private MongoDbTransport $transport;
+    private bool $isReplicaSet = false;
+
+    /** Cached across tests: the readiness probe and the replica set detection run once per process. */
+    private static ?bool $serverReachable = null;
+    private static bool $replicaSet = false;
 
     protected function setUp(): void
     {
@@ -47,13 +52,45 @@ class MongoDbTransportIntegrationTest extends TestCase
 
         $this->client = new Client(getenv('MONGODB_URI') ?: 'mongodb://localhost:27017', ['serverSelectionTimeoutMS' => 3000]);
 
-        try {
-            $this->client->getDatabase(self::DATABASE)->command(['ping' => 1]);
-        } catch (\Throwable) {
+        if (null === self::$serverReachable) {
+            // the replica set service can take a few seconds to become ready in
+            // CI: retry the ping, then remember the outcome for the whole class
+            $probeClient = new Client(getenv('MONGODB_URI') ?: 'mongodb://localhost:27017', ['serverSelectionTimeoutMS' => 1000]);
+            $lastThrowable = null;
+
+            for ($attempt = 0; $attempt < 15; ++$attempt) {
+                try {
+                    $probeClient->getDatabase(self::DATABASE)->command(['ping' => 1]);
+                    self::$serverReachable = true;
+                    $lastThrowable = null;
+                    break;
+                } catch (\Throwable $throwable) {
+                    $lastThrowable = $throwable;
+                    sleep(1);
+                }
+            }
+
+            if (null !== $lastThrowable) {
+                self::$serverReachable = false;
+            } else {
+                $hello = $this->client->getDatabase('admin')->command(['hello' => 1])->toArray()[0];
+                self::$replicaSet = isset($hello['setName']) || isset($hello->setName);
+            }
+        }
+
+        $this->isReplicaSet = self::$replicaSet;
+
+        if (!self::$serverReachable) {
             $this->markTestSkipped('MongoDB server not found.');
         }
 
-        $this->connection = Connection::fromDsn('mongodb://localhost/'.self::DATABASE, [], $this->client);
+        $hello = $this->client->getDatabase('admin')->command(['hello' => 1])->toArray()[0];
+        $this->isReplicaSet = isset($hello['setName']) || isset($hello->setName);
+
+        // the existing tests assert polling semantics: disable the change stream
+        // to keep them fast and deterministic (the stream path is covered by
+        // dedicated tests using explicitly stream-enabled connections)
+        $this->connection = Connection::fromDsn('mongodb://localhost/'.self::DATABASE, ['wait_time' => 0], $this->client);
         $this->connection->deleteAll();
         $this->transport = new MongoDbTransport($this->connection, new PhpSerializer());
     }
@@ -152,5 +189,46 @@ class MongoDbTransportIntegrationTest extends TestCase
         }
 
         $this->assertContainsEquals(['availableAt' => 1, 'queueName' => 1, 'deliveredAt' => 1], $indexKeys);
+    }
+
+    public function testChangeStreamWakesUpAnOpenStream()
+    {
+        if (!$this->isReplicaSet) {
+            $this->markTestSkipped('Change streams require a replica set.');
+        }
+
+        if (!\function_exists('proc_open')) {
+            $this->markTestSkipped('proc_open is required to run the wake-up test.');
+        }
+
+        // 15 s leaves headroom for the producer subprocess to boot and connect
+        $streamConnection = Connection::fromDsn('mongodb://localhost/'.self::DATABASE, ['wait_time' => 15], $this->client);
+
+        // a subprocess inserts the message about 400 ms after this test starts,
+        // while the get() call below is already blocked on the change stream
+        $code = \sprintf(
+            'require %s; usleep(400000); $client = new MongoDB\Client(%s, ["serverSelectionTimeoutMS" => 5000]); $connection = Symfony\Component\Messenger\Bridge\MongoDb\Transport\Connection::fromDsn("mongodb://localhost/%s", [], $client); $connection->send("streamed");',
+            var_export(\dirname(__DIR__, 8).'/vendor/autoload.php', true),
+            var_export(getenv('MONGODB_URI') ?: 'mongodb://localhost:27017', true),
+            self::DATABASE
+        );
+
+        $producer = proc_open([\PHP_BINARY, '-r', $code], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+
+        $start = microtime(true);
+        $document = $streamConnection->get();
+        $elapsed = microtime(true) - $start;
+
+        if (\is_resource($producer)) {
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            proc_close($producer);
+        }
+
+        $this->assertNotNull($document);
+        $this->assertSame('streamed', $document['body']);
+        // the message was inserted after the get() call started: a poll query
+        // could never return it, only the change stream wait waking up could
+        $this->assertGreaterThanOrEqual(0.15, $elapsed);
     }
 }
