@@ -117,9 +117,15 @@ jobs:
         ports:
           - 5672:5672
       mongodb:
-        image: mongo # zizmor: ignore[unpinned-images]
+        image: bitnamilegacy/mongodb:latest # zizmor: ignore[unpinned-images]
         ports:
           - 27017:27017
+        env:
+          ALLOW_EMPTY_PASSWORD: "yes"
+          MONGODB_REPLICA_SET_MODE: "primary"
+          MONGODB_REPLICA_SET_NAME: "rs0"
+          MONGODB_ADVERTISED_HOSTNAME: "127.0.0.1"
+          MONGODB_PORT_NUMBER: "27017"
       couchbase:
         image: couchbase:6.5.1
         ports:
