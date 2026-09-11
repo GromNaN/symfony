@@ -224,6 +224,14 @@
     {{ block('form_widget_simple') }}
 {%- endblock password_widget -%}
 
+{%- block write_only_widget -%}
+    {{- form_widget(form.value) -}}
+    {%- if show_clear|default(false) and form.clear is defined -%}
+        {{- form_widget(form.clear) -}}
+        {{- form_label(form.clear) -}}
+    {%- endif -%}
+{%- endblock write_only_widget -%}
+
 {%- block hidden_widget -%}
     {%- set type = type|default('hidden') -%}
     {{ block('form_widget_simple') }}

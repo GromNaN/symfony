@@ -4,6 +4,7 @@ CHANGELOG
 8.2
 ---
 
+ * Add the `WriteOnlyType` for editing sensitive values: the stored value is never rendered, an empty submission keeps it unchanged, and an optional `clear` child sets it to null
  * Add `#[AsFormType]` and `#[FormField]` attributes to derive a form type from the properties of a data class
  * Add the `allow_array_submission` option to let `PRE_SUBMIT` listeners turn a submitted array into data the form accepts
  * Add support for grouping and nested steps in `FormFlowType`
