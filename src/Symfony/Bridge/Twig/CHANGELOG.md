@@ -4,6 +4,7 @@ CHANGELOG
 8.2
 ---
 
+ * Add the `write_only_widget` theme block for the `WriteOnlyType` form field
  * Add the `logout_form()` function to build a form that logs the user out with a POST
  * Add the `normalize` filter to normalize values with the Serializer component
  * Add the `impersonation_form()` and `impersonation_exit_form()` functions to build a form that switches the user with a POST

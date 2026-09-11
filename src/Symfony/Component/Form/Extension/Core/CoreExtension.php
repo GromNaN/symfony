@@ -80,6 +80,7 @@ class CoreExtension extends AbstractExtension
             new Type\TelType(),
             new Type\ColorType($this->translator),
             new Type\WeekType(),
+            new Type\WriteOnlyType(),
             new Flow\Type\ButtonFlowType(),
             new Flow\Type\FinishFlowType(),
             new Flow\Type\NavigatorFlowType(),
