@@ -37,10 +37,8 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
      *
      * @return Envelope[]
      */
-    public function get(/* int $fetchSize = 1 */): iterable
+    public function get(int $fetchSize = 1): iterable
     {
-        $fetchSize = \func_num_args() > 0 ? max(1, func_get_arg(0)) : 1;
-
         $envelopes = [];
         while ($fetchSize-- > 0 && null !== $document = $this->connection->get()) {
             $envelopes[] = $this->createEnvelope($document);
@@ -51,12 +49,12 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
 
     public function ack(Envelope $envelope): void
     {
-        $this->connection->ack($this->findReceivedStamp($envelope)->getId());
+        $this->connection->delete($this->findReceivedStamp($envelope)->getId());
     }
 
     public function reject(Envelope $envelope): void
     {
-        $this->connection->reject($this->findReceivedStamp($envelope)->getId());
+        $this->connection->delete($this->findReceivedStamp($envelope)->getId());
     }
 
     /**
@@ -106,7 +104,7 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
                 'headers' => $headers,
             ]);
         } catch (MessageDecodingFailedException $exception) {
-            $this->connection->reject($documentId);
+            $this->connection->delete($documentId);
 
             throw $exception;
         }
