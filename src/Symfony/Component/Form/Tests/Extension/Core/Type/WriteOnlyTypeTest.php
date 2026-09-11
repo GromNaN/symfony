@@ -93,9 +93,16 @@ class WriteOnlyTypeTest extends FormIntegrationTestCase
         $this->assertSame('  abc  ', $form->getData());
     }
 
-    public function testClearSetsNull()
+    public function testClearCheckboxIsOptionalByDefault()
     {
         $form = $this->scalarForm('s3cret');
+
+        $this->assertFalse($form->has('clear'));
+    }
+
+    public function testClearSetsNull()
+    {
+        $form = $this->scalarForm('s3cret', ['allow_clear' => true]);
         $form->submit(['value' => '', 'clear' => '1']);
 
         $this->assertNull($form->getData());
@@ -103,22 +110,30 @@ class WriteOnlyTypeTest extends FormIntegrationTestCase
 
     public function testClearWinsOverTypedValue()
     {
-        $form = $this->scalarForm('s3cret');
+        $form = $this->scalarForm('s3cret', ['allow_clear' => true]);
         $form->submit(['value' => 'ignored', 'clear' => '1']);
 
         $this->assertNull($form->getData());
     }
 
+    public function testAllowClearNullOffersTheCheckboxWhenNotRequired()
+    {
+        $form = $this->scalarForm('s3cret', ['allow_clear' => null, 'required' => false]);
+
+        $this->assertTrue($form->has('clear'));
+    }
+
     public function testClearCheckboxIsHiddenWhenNoStoredValue()
     {
-        $view = $this->scalarForm(null)->createView();
+        $view = $this->scalarForm(null, ['allow_clear' => true])->createView();
 
         $this->assertFalse($view->vars['show_clear']);
+        $this->assertTrue($view->offsetExists('clear'));
     }
 
     public function testClearCheckboxIsShownWhenStoredValueExists()
     {
-        $view = $this->scalarForm('s3cret')->createView();
+        $view = $this->scalarForm('s3cret', ['allow_clear' => true])->createView();
 
         $this->assertTrue($view->vars['show_clear']);
         $this->assertTrue($view->offsetExists('clear'));

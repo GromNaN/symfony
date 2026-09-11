@@ -70,20 +70,19 @@ class WriteOnlyType extends AbstractType
             ->setDefaults([
                 'compound' => true,
                 'data_class' => null,
-                // A sensitive value is nullable by nature: optional by default,
-                // which also makes the clear checkbox available. Setting
-                // required => true hides the clear checkbox, making required
-                // the nullability hint of the field.
+                // A sensitive value is nullable by nature, hence optional by
+                // default. Enforce presence at creation with a constraint.
                 'required' => false,
                 // Prevents the compound default (an empty array for a form
                 // without data_class) from being substituted when the stored
                 // value is itself empty: the mapper must keep seeing the true
                 // old value to leave it untouched.
                 'empty_data' => fn (FormInterface $form): mixed => $form->getData(),
-                // Smart default: a required, hence non-nullable property has no
-                // point in a destructive clear. Pass allow_clear explicitly to
-                // override it.
-                'allow_clear' => fn (Options $options): bool => !$options['required'],
+                // The clear checkbox is optional: off by default and only
+                // added when explicitly requested. Passing null opts into the
+                // smart rule, which offers the clear checkbox only when the
+                // field can actually hold null (not required).
+                'allow_clear' => false,
                 'clear_label' => 'Delete current value',
                 // null uses the parent's domain, false disables translation,
                 // any string names a domain. Same contract as ChoiceType's
@@ -96,12 +95,13 @@ class WriteOnlyType extends AbstractType
                 // render on this field's own row, not bubble to the parent.
                 'error_bubbling' => false,
             ])
-            ->setAllowedTypes('allow_clear', 'bool')
+            ->setAllowedTypes('allow_clear', ['bool', 'null'])
             ->setAllowedTypes('clear_label', 'string')
             ->setAllowedTypes('clear_translation_domain', ['null', 'bool', 'string'])
             ->setAllowedTypes('clear_attr', 'array')
             ->setAllowedTypes('value_type', 'string')
             ->setAllowedTypes('value_options', 'array')
+            ->setNormalizer('allow_clear', static fn (Options $options, ?bool $allowClear): bool => $allowClear ?? !$options['required'])
         ;
     }
 
