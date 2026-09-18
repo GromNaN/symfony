@@ -225,7 +225,11 @@
 {%- endblock password_widget -%}
 
 {%- block write_only_widget -%}
-    {{- form_widget(form.value) -}}
+    {%- if has_value|default(false) and existing_value_placeholder is defined and existing_value_placeholder is not empty -%}
+        {{- form_widget(form.value, {attr: form.value.vars.attr|default({})|merge({placeholder: existing_value_placeholder})}) -}}
+    {%- else -%}
+        {{- form_widget(form.value) -}}
+    {%- endif -%}
     {%- if show_clear|default(false) and form.clear is defined -%}
         {{- form_widget(form.clear) -}}
         {{- form_label(form.clear) -}}
