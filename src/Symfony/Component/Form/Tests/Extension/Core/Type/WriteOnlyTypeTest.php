@@ -151,7 +151,7 @@ class WriteOnlyTypeTest extends FormIntegrationTestCase
         $view = $this->scalarForm('s3cret')->createView();
 
         $this->assertTrue($view->vars['has_value']);
-        $this->assertNull($view->vars['existing_value_placeholder']);
+        $this->assertSame('*****', $view->vars['existing_value_placeholder']);
 
         $emptyView = $this->scalarForm(null)->createView();
         $this->assertFalse($emptyView->vars['has_value']);
@@ -164,6 +164,15 @@ class WriteOnlyTypeTest extends FormIntegrationTestCase
         ])->createView();
 
         $this->assertSame('Leave blank to keep the current value', $view->vars['existing_value_placeholder']);
+    }
+
+    public function testExistingValuePlaceholderCanBeDisabled()
+    {
+        $view = $this->scalarForm('s3cret', [
+            'existing_value_placeholder' => null,
+        ])->createView();
+
+        $this->assertNull($view->vars['existing_value_placeholder']);
     }
 
     public function testRequiredNewFormEmptySubmissionIsInvalid()

@@ -83,11 +83,11 @@ class WriteOnlyType extends AbstractType
                 // smart rule, which offers the clear checkbox only when the
                 // field can actually hold null (not required).
                 'allow_clear' => false,
-                // A placeholder applied to the inner input only when a value
-                // already exists, telling the operator that an empty field
-                // keeps it (for example "Leave blank to keep the current
-                // value"). Never echoes the value itself.
-                'existing_value_placeholder' => null,
+                // A masked placeholder applied to the inner input when a value
+                // already exists, so that the operator knows a value is stored
+                // without ever seeing it. Set to null to disable, or to any
+                // string to customize (for example a translated hint).
+                'existing_value_placeholder' => '*****',
                 'clear_label' => 'Delete current value',
                 // null uses the parent's domain, false disables translation,
                 // any string names a domain. Same contract as ChoiceType's
