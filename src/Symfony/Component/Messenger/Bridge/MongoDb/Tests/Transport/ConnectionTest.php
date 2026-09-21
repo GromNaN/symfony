@@ -229,6 +229,94 @@ class ConnectionTest extends TestCase
         $this->assertSame($document, $connection->get());
     }
 
+    public function testGetFromQueuesClaimsAcrossSeveralQueuesWithASingleRequest()
+    {
+        $collection = $this->createMock(Collection::class);
+
+        $clock = new MockClock();
+        $connection = new Connection($collection, 'foobar', 100, $clock);
+        $document = $this->createDocumentDeliveredTo($connection->getUniqueId());
+
+        $collection->expects($this->once())
+            ->method('findOneAndUpdate')
+            ->with(
+                $this->equalTo([
+                    '$or' => [
+                        ['deliveredAt' => null],
+                        ['deliveredAt' => [
+                            '$lt' => new UTCDateTime($clock->now()->modify('-100 seconds')),
+                        ]],
+                    ],
+                    'availableAt' => ['$lte' => new UTCDateTime($clock->now())],
+                    'queueName' => ['$in' => ['foo', 'bar']],
+                ]),
+                $this->anything(),
+                $this->anything()
+            )
+            ->willReturn($document);
+
+        $this->assertSame($document, $connection->getFromQueues(['foo', 'bar']));
+    }
+
+    public function testGetFromQueuesFallsBackToAScalarFilterForASingleQueue()
+    {
+        $collection = $this->createMock(Collection::class);
+
+        $clock = new MockClock();
+        $connection = new Connection($collection, 'foobar', 100, $clock);
+        $document = $this->createDocumentDeliveredTo($connection->getUniqueId());
+
+        $collection->expects($this->once())
+            ->method('findOneAndUpdate')
+            ->with(
+                $this->callback(static function (array $filter): bool {
+                    // a single queue keeps the scalar equality, not an $in
+                    return isset($filter['queueName']) && 'foobar' === $filter['queueName'];
+                }),
+                $this->anything(),
+                $this->anything()
+            )
+            ->willReturn($document);
+
+        $this->assertSame($document, $connection->getFromQueues(['foobar']));
+    }
+
+    public function testGetFromQueuesListensOnASingleStreamAcrossSeveralQueues()
+    {
+        $changeStream = $this->createMock(ChangeStream::class);
+        $changeStream->method('valid')
+            ->willReturn(true);
+        $changeStream->expects($this->once())
+            ->method('rewind');
+
+        $collection = $this->createMock(Collection::class);
+        $collection->expects($this->once())
+            ->method('watch')
+            ->with(
+                $this->equalTo([
+                    ['$match' => ['operationType' => 'insert', 'fullDocument.queueName' => ['$in' => ['foo', 'bar']]]],
+                    ['$project' => ['_id' => 1]],
+                ]),
+                $this->callback(static function (array $options): bool {
+                    self::assertLessThanOrEqual(1000, $options['maxAwaitTimeMS']);
+                    self::assertGreaterThan(0, $options['maxAwaitTimeMS']);
+                    self::assertSame(['root' => 'bson'], $options['typeMap']);
+
+                    return true;
+                })
+            )
+            ->willReturn($changeStream);
+
+        $connection = new Connection($collection, 'default');
+        $document = $this->createDocumentDeliveredTo($connection->getUniqueId());
+
+        // the outer claim finds nothing, the single stream wakes up and the claim returns the document
+        $collection->method('findOneAndUpdate')
+            ->willReturnOnConsecutiveCalls(null, $document);
+
+        $this->assertSame($document, $connection->getFromQueues(['foo', 'bar']));
+    }
+
     public function testGetWrapsMongoExceptions()
     {
         $collection = $this->createStub(Collection::class);

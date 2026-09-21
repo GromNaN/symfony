@@ -72,6 +72,55 @@ class MongoDbReceiverTest extends TestCase
         $this->assertCount(1, $receiver->get());
     }
 
+    public function testItReturnsTheDecodedMessageFromTheGivenQueues()
+    {
+        $serializer = new PhpSerializer();
+        $document = $this->createDocument($serializer->encode(new Envelope(new DummyMessage('Hi'))));
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('getFromQueues')
+            ->with(['foo', 'bar'])
+            ->willReturn($document);
+
+        $receiver = new MongoDbReceiver($connection, $serializer);
+        $envelopes = $receiver->getFromQueues(['foo', 'bar']);
+
+        $this->assertCount(1, $envelopes);
+        $this->assertSame('Hi', $envelopes[0]->getMessage()->getMessage());
+        $this->assertSame((string) $document->_id, $envelopes[0]->last(MongoDbReceivedStamp::class)->getId());
+    }
+
+    public function testItReturnsEmptyFromTheGivenQueuesWhenThereAreNoMessages()
+    {
+        $connection = $this->createStub(Connection::class);
+        $connection->method('getFromQueues')->willReturn(null);
+
+        $receiver = new MongoDbReceiver($connection, $this->createStub(SerializerInterface::class));
+
+        $this->assertSame([], $receiver->getFromQueues(['foo', 'bar']));
+    }
+
+    public function testItFetchesSeveralMessagesFromTheGivenQueues()
+    {
+        $serializer = new PhpSerializer();
+        $document1 = $this->createDocument($serializer->encode(new Envelope(new DummyMessage('Hi'))));
+        $document2 = $this->createDocument($serializer->encode(new Envelope(new DummyMessage('Ho'))));
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->exactly(2))
+            ->method('getFromQueues')
+            ->with(['foo', 'bar'])
+            ->willReturnOnConsecutiveCalls($document1, $document2);
+
+        $receiver = new MongoDbReceiver($connection, $serializer);
+        $envelopes = $receiver->getFromQueues(['foo', 'bar'], 2);
+
+        $this->assertCount(2, $envelopes);
+        $this->assertSame('Hi', $envelopes[0]->getMessage()->getMessage());
+        $this->assertSame('Ho', $envelopes[1]->getMessage()->getMessage());
+    }
+
     public function testItRejectsTheMessageIfItCannotBeDecoded()
     {
         $document = $this->createDocument(['body' => 'foo']);
