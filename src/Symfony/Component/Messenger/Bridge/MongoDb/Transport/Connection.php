@@ -154,7 +154,8 @@ class Connection
     }
 
     /**
-     * Returns the next available message, claimed with an atomic lock.
+     * Returns the next available message from the configured queue, claimed
+     * with an atomic lock.
      *
      * When nothing is claimable, the connection listens on the change stream
      * for new inserts instead of returning immediately, so idle workers wake
@@ -164,16 +165,37 @@ class Connection
      */
     public function get(): ?BSONDocument
     {
-        return $this->getAndLock() ?? $this->getFromStream();
+        return $this->getFromQueues([$this->queueName]);
+    }
+
+    /**
+     * Returns the next available message across the given queues, claimed with
+     * an atomic lock.
+     *
+     * A single change stream covers every queue, so listening to several queues
+     * costs one server request, not one per queue. The queues are served in FIFO
+     * order (sorted by availableAt), with no priority between them.
+     *
+     * @param string[] $queueNames
+     *
+     * @throws TransportException
+     */
+    public function getFromQueues(array $queueNames): ?BSONDocument
+    {
+        $queueNames = array_values(array_unique($queueNames));
+
+        return $this->getAndLock($queueNames) ?? $this->getFromStream($queueNames);
     }
 
     /**
      * Claims the oldest available message with an atomic findOneAndUpdate, or
      * returns null when there is nothing to claim.
      *
+     * @param string[] $queueNames
+     *
      * @throws TransportException
      */
-    private function getAndLock(): ?BSONDocument
+    private function getAndLock(array $queueNames): ?BSONDocument
     {
         $options = $this->getWriteOptions();
         $options['returnDocument'] = FindOneAndUpdate::RETURN_DOCUMENT_AFTER;
@@ -190,7 +212,7 @@ class Connection
         ];
 
         try {
-            $updatedDocument = $this->collection->findOneAndUpdate($this->createAvailableMessagesQuery(), $updateStatement, $options);
+            $updatedDocument = $this->collection->findOneAndUpdate($this->createAvailableMessagesQuery($queueNames), $updateStatement, $options);
         } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
@@ -221,7 +243,7 @@ class Connection
      *
      * @throws TransportException
      */
-    private function getFromStream(): ?BSONDocument
+    private function getFromStream(array $queueNames): ?BSONDocument
     {
         if (!$this->useChangeStream) {
             return null;
@@ -237,7 +259,7 @@ class Connection
                     [
                         ['$match' => [
                             'operationType' => 'insert',
-                            'fullDocument.queueName' => $this->queueName,
+                            'fullDocument.queueName' => $this->queueFilter($queueNames),
                         ]],
                         // events only wake the worker: strip the payload, keep the resume token _id
                         ['$project' => ['_id' => 1]],
@@ -273,7 +295,7 @@ class Connection
             // release the cursor and its session before claiming
             unset($changeStream);
 
-            if (null !== $document = $this->getAndLock()) {
+            if (null !== $document = $this->getAndLock($queueNames)) {
                 return $document;
             }
 
@@ -336,7 +358,7 @@ class Connection
     public function getMessageCount(): int
     {
         try {
-            return $this->collection->countDocuments($this->createAvailableMessagesQuery());
+            return $this->collection->countDocuments($this->createAvailableMessagesQuery([$this->queueName]));
         } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
@@ -369,7 +391,7 @@ class Connection
         }
 
         try {
-            return $this->collection->find($this->createAvailableMessagesQuery(), $this->setTypeMapOption($options));
+            return $this->collection->find($this->createAvailableMessagesQuery([$this->queueName]), $this->setTypeMapOption($options));
         } catch (MongoDriverException $exception) {
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
@@ -402,9 +424,11 @@ class Connection
     }
 
     /**
+     * @param string[] $queueNames
+     *
      * @return array<string, mixed>
      */
-    private function createAvailableMessagesQuery(): array
+    private function createAvailableMessagesQuery(array $queueNames): array
     {
         $now = $this->now();
         $redeliverLimit = $now->modify(\sprintf('-%d seconds', $this->redeliverTimeout));
@@ -417,8 +441,22 @@ class Connection
                 ]],
             ],
             'availableAt' => ['$lte' => new UTCDateTime($now)],
-            'queueName' => $this->queueName,
+            'queueName' => $this->queueFilter($queueNames),
         ];
+    }
+
+    /**
+     * Builds the queueName filter: a scalar equality for a single queue (the
+     * common, mono-queue case) and an $in for several, so listening to multiple
+     * queues stays a single server request.
+     *
+     * @param string[] $queueNames
+     *
+     * @return string|array<string, mixed>
+     */
+    private function queueFilter(array $queueNames): string|array
+    {
+        return 1 === \count($queueNames) ? $queueNames[0] : ['$in' => array_values($queueNames)];
     }
 
     /**

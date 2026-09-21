@@ -19,12 +19,13 @@ use Symfony\Component\Messenger\Exception\MessageDecodingFailedException;
 use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
 use Symfony\Component\Messenger\Transport\Receiver\ListableReceiverInterface;
 use Symfony\Component\Messenger\Transport\Receiver\MessageCountAwareInterface;
+use Symfony\Component\Messenger\Transport\Receiver\QueueReceiverInterface;
 use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 
 /**
  * @author Alessandro Lai <alessandro.lai85@gmail.com>
  */
-class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInterface
+class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInterface, QueueReceiverInterface
 {
     public function __construct(
         private Connection $connection,
@@ -39,6 +40,26 @@ class MongoDbReceiver implements MessageCountAwareInterface, ListableReceiverInt
     {
         $envelopes = [];
         while ($fetchSize-- > 0 && null !== $document = $this->connection->get()) {
+            $envelopes[] = $this->createEnvelope($document);
+        }
+
+        return $envelopes;
+    }
+
+    /**
+     * Consumes from several queues with a single server request.
+     *
+     * @param string[] $queueNames
+     *
+     * @return Envelope[]
+     */
+    public function getFromQueues(array $queueNames/* , int $fetchSize = 1 */): iterable
+    {
+        $fetchSize = \func_num_args() > 1 ? func_get_arg(1) : 1;
+        $queueNames = array_values(array_unique($queueNames));
+
+        $envelopes = [];
+        while ($fetchSize-- > 0 && null !== $document = $this->connection->getFromQueues($queueNames)) {
             $envelopes[] = $this->createEnvelope($document);
         }
 

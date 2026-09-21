@@ -27,6 +27,8 @@ class MongoDbTransportReplicaSetIntegrationTest extends TestCase
 
     private static ?bool $replicaSet = null;
 
+    private static ?Client $cachedClient = null;
+
     protected function setUp(): void
     {
         if (!class_exists(Client::class)) {
@@ -38,7 +40,7 @@ class MongoDbTransportReplicaSetIntegrationTest extends TestCase
                 $client = new Client($this->replicaSetUri(), ['serverSelectionTimeoutMS' => 2000]);
                 $hello = $client->getDatabase('admin')->command(['hello' => 1])->toArray()[0];
                 self::$replicaSet = isset($hello['setName']) || isset($hello->setName);
-                $this->client = $client;
+                self::$cachedClient = $client;
             } catch (\Throwable) {
                 self::$replicaSet = false;
             }
@@ -52,7 +54,8 @@ class MongoDbTransportReplicaSetIntegrationTest extends TestCase
             $this->markTestSkipped('Change streams require a replica set.');
         }
 
-        $this->client->getCollection(self::DATABASE, 'messenger_messages')->deleteMany(['queueName' => 'default']);
+        $this->client = self::$cachedClient;
+        $this->client->getCollection(self::DATABASE, 'messenger_messages')->deleteMany(['queueName' => ['$in' => ['default', 'foo', 'bar']]]);
     }
 
     public function testChangeStreamWakesUpAnOpenStream()
@@ -90,6 +93,48 @@ class MongoDbTransportReplicaSetIntegrationTest extends TestCase
         $this->assertSame('streamed', $document['body']);
         // the message was inserted after the get() call started: a poll query
         // could never return it, only the change stream wait waking up could
+        $this->assertGreaterThanOrEqual(0.15, $elapsed);
+    }
+
+    public function testChangeStreamWakesUpAcrossSeveralQueues()
+    {
+        if (!\function_exists('proc_open')) {
+            $this->markTestSkipped('proc_open is required to run the wake-up test.');
+        }
+
+        // the configured queue is "default", but the worker listens to several
+        // queues through a single change stream
+        $streamConnection = Connection::fromDsn($this->replicaSetUri(), ['wait_time' => 15, 'database' => self::DATABASE, 'queue_name' => 'default'], $this->client);
+
+        // a subprocess inserts into the "bar" queue about 400 ms after this test
+        // starts, while the getFromQueues() call below is already blocked on the
+        // change stream
+        $code = \sprintf(
+            'require %s; usleep(400000); $client = new MongoDB\Client(%s, ["serverSelectionTimeoutMS" => 5000]); $connection = Symfony\Component\Messenger\Bridge\MongoDb\Transport\Connection::fromDsn(%s, ["database" => %s, "queue_name" => "bar"], $client); $connection->send("streamed");',
+            var_export(\dirname(__DIR__, 8).'/vendor/autoload.php', true),
+            var_export($this->replicaSetUri(), true),
+            var_export($this->replicaSetUri(), true),
+            var_export(self::DATABASE, true)
+        );
+
+        $producer = proc_open([\PHP_BINARY, '-r', $code], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+
+        $start = microtime(true);
+        $document = $streamConnection->getFromQueues(['default', 'foo', 'bar']);
+        $elapsed = microtime(true) - $start;
+
+        if (\is_resource($producer)) {
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            proc_close($producer);
+        }
+
+        $this->assertNotNull($document);
+        $this->assertSame('streamed', $document['body']);
+        $this->assertSame('bar', (string) $document['queueName']);
+        // the message was inserted into "bar" after the call started, while the
+        // configured queue is "default": only a single change stream covering
+        // every listed queue could wake up and return it
         $this->assertGreaterThanOrEqual(0.15, $elapsed);
     }
 

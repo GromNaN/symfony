@@ -14,6 +14,7 @@ namespace Symfony\Component\Messenger\Bridge\MongoDb\Transport;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Transport\Receiver\ListableReceiverInterface;
 use Symfony\Component\Messenger\Transport\Receiver\MessageCountAwareInterface;
+use Symfony\Component\Messenger\Transport\Receiver\QueueReceiverInterface;
 use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 use Symfony\Component\Messenger\Transport\SetupableTransportInterface;
 use Symfony\Component\Messenger\Transport\TransportInterface;
@@ -21,7 +22,7 @@ use Symfony\Component\Messenger\Transport\TransportInterface;
 /**
  * @author Alessandro Lai <alessandro.lai85@gmail.com>
  */
-class MongoDbTransport implements TransportInterface, SetupableTransportInterface, MessageCountAwareInterface, ListableReceiverInterface
+class MongoDbTransport implements TransportInterface, SetupableTransportInterface, MessageCountAwareInterface, ListableReceiverInterface, QueueReceiverInterface
 {
     private MongoDbReceiver $receiver;
     private MongoDbSender $sender;
@@ -40,6 +41,16 @@ class MongoDbTransport implements TransportInterface, SetupableTransportInterfac
     public function get(/* int $fetchSize = 1 */): iterable
     {
         return $this->getReceiver()->get(\func_num_args() > 0 ? func_get_arg(0) : 1);
+    }
+
+    /**
+     * @param string[] $queueNames
+     *
+     * @return Envelope[]
+     */
+    public function getFromQueues(array $queueNames/* , int $fetchSize = 1 */): iterable
+    {
+        return $this->getReceiver()->getFromQueues($queueNames, \func_num_args() > 1 ? func_get_arg(1) : 1);
     }
 
     public function ack(Envelope $envelope): void
