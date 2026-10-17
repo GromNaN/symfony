@@ -140,6 +140,32 @@ class VideoValidatorTest extends ConstraintValidatorTestCase
             ->assertRaised();
     }
 
+    public function testRotatedVideoUsesDisplayedDimensions()
+    {
+        $constraint = new Video(maxWidth: 1, maxWidthMessage: 'myMessage');
+
+        $this->validator->validate(__DIR__.'/Fixtures/test_rotated.mp4', $constraint);
+
+        $this->buildViolation('myMessage')
+            ->setParameter('{{ width }}', 2)
+            ->setParameter('{{ max_width }}', 1)
+            ->setCode(Video::TOO_WIDE_ERROR)
+            ->assertRaised();
+    }
+
+    public function testRotatedVideoIsLandscape()
+    {
+        $constraint = new Video(allowLandscape: false, allowLandscapeMessage: 'myMessage');
+
+        $this->validator->validate(__DIR__.'/Fixtures/test_rotated.mp4', $constraint);
+
+        $this->buildViolation('myMessage')
+            ->setParameter('{{ width }}', 2)
+            ->setParameter('{{ height }}', 1)
+            ->setCode(Video::LANDSCAPE_NOT_ALLOWED_ERROR)
+            ->assertRaised();
+    }
+
     public function testPixelsTooFew()
     {
         $constraint = new Video(minPixels: 5, minPixelsMessage: 'myMessage');

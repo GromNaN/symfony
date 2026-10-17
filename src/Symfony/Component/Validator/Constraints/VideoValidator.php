@@ -52,7 +52,7 @@ class VideoValidator extends FileValidator
             'ffprobe',
             '-v', 'error',
             '-select_streams', 'v',
-            '-show_entries', 'stream=index,codec_type,codec_name,width,height',
+            '-show_entries', 'stream=index,codec_type,codec_name,width,height:stream_side_data=rotation:stream_tags=rotate',
             '-show_entries', 'format=format_name',
             '-of', 'json',
             '--',
@@ -82,6 +82,19 @@ class VideoValidator extends FileValidator
 
         $width = $streams[0]['width'];
         $height = $streams[0]['height'];
+
+        // Players rotate the video for display, so validate the displayed dimensions
+        $rotation = (int) ($streams[0]['tags']['rotate'] ?? 0);
+        foreach ($streams[0]['side_data_list'] ?? [] as $sideData) {
+            if (isset($sideData['rotation'])) {
+                $rotation = (int) $sideData['rotation'];
+                break;
+            }
+        }
+
+        if (90 === abs($rotation) % 180) {
+            [$width, $height] = [$height, $width];
+        }
 
         if (1 !== \count($streams)) {
             $this->context->buildViolation($constraint->multipleVideoStreamsMessage)
