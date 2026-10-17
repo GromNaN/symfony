@@ -52,7 +52,7 @@ class VideoValidator extends FileValidator
             'ffprobe',
             '-v', 'error',
             '-select_streams', 'v',
-            '-show_entries', 'stream=index,codec_type,codec_name,width,height:stream_side_data=rotation:stream_tags=rotate',
+            '-show_entries', 'stream=index,codec_type,codec_name,width,height:stream_side_data=rotation:stream_tags=rotate:stream_disposition=attached_pic',
             '-show_entries', 'format=format_name',
             '-of', 'json',
             '--',
@@ -71,6 +71,15 @@ class VideoValidator extends FileValidator
         $meta = json_decode($process->getOutput(), true) ?: [];
         $streams = $meta['streams'] ?? [];
         $formats = explode(',', strtolower($meta['format']['format_name'] ?? 'unknown'));
+
+        // An attached picture, like a cover art, is a still image, not a video
+        if ($streams[0]['disposition']['attached_pic'] ?? false) {
+            $this->context->buildViolation($constraint->thumbnailNotAllowedMessage)
+                ->setCode(Video::THUMBNAIL_NOT_ALLOWED_ERROR)
+                ->addViolation();
+
+            return;
+        }
 
         if (!($streams[0]['width'] ?? false) || !($streams[0]['height'] ?? false)) {
             $this->context->buildViolation($constraint->sizeNotDetectedMessage)

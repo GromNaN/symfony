@@ -345,4 +345,24 @@ class VideoValidatorTest extends ConstraintValidatorTestCase
             ->setCode(Video::UNSUPPORTED_VIDEO_CONTAINER_ERROR)
             ->assertRaised();
     }
+
+    public function testThumbnailNotAllowed()
+    {
+        $constraint = new Video(thumbnailNotAllowedMessage: 'myMessage');
+        $this->validator->validate(__DIR__.'/Fixtures/test_thumbnail.mp4', $constraint);
+
+        $this->buildViolation('myMessage')
+            ->setCode(Video::THUMBNAIL_NOT_ALLOWED_ERROR)
+            ->assertRaised();
+    }
+
+    public function testThumbnailNotAllowedWithAllowedCodec()
+    {
+        $constraint = new Video(allowedCodecs: ['mjpeg'], thumbnailNotAllowedMessage: 'myMessage');
+        $this->validator->validate(__DIR__.'/Fixtures/test_thumbnail.mp4', $constraint);
+
+        $this->buildViolation('myMessage')
+            ->setCode(Video::THUMBNAIL_NOT_ALLOWED_ERROR)
+            ->assertRaised();
+    }
 }
